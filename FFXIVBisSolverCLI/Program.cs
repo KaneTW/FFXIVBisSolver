@@ -27,21 +27,17 @@ namespace FFXIVBisSolverCLI
     public class AppConfig
     {
         public Dictionary<ClassJob, JobConfig> JobConfigs { get; set; }
-        public RelicConfig RelicConfig { get; set; }
+        public Dictionary<int, int> RelicCaps { get; set; }
+        public Dictionary<BaseParam, int> BaseStats { get; set; }
     }
 
     public class JobConfig
     {
         public Dictionary<BaseParam, double> Weights { get; set; }
         public Dictionary<BaseParam, int> StatRequirements { get; set; }
-        public Dictionary<BaseParam, int> BaseStats { get; set; }
+        
     }
-
-    public class RelicConfig
-    {
-        public Dictionary<int, int> RelicCaps { get; set; }
-    }
-
+    
     public class Program
     {
         //TODO: make this more pretty
@@ -151,8 +147,8 @@ namespace FFXIVBisSolverCLI
                         i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()) - 1);
 
                 var relicCaps =
-                    equip.Where(e => config.RelicConfig.RelicCaps.ContainsKey(e.ItemLevel.Key))
-                        .ToDictionary(e => e, e => config.RelicConfig.RelicCaps[e.ItemLevel.Key]);
+                    equip.Where(e => config.RelicCaps.ContainsKey(e.ItemLevel.Key))
+                        .ToDictionary(e => e, e => config.RelicCaps[e.ItemLevel.Key]);
 
                 //TODO: improve solver handling
                 SolverBase solver = new GLPKSolver();
@@ -172,7 +168,7 @@ namespace FFXIVBisSolverCLI
 
                 using (var scope = new ModelScope())
                 {
-                    var model = new BisModel(jobConfig.Weights, jobConfig.StatRequirements, jobConfig.BaseStats,
+                    var model = new BisModel(jobConfig.Weights, jobConfig.StatRequirements, config.BaseStats,
                         equip, food, materia, relicCaps);
                     var solution = solver.Solve(model.Model);
                     model.ApplySolution(solution);

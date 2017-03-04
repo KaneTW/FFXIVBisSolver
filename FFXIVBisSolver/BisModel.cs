@@ -284,7 +284,7 @@ namespace FFXIVBisSolver
             }
         }
 
-        public Dictionary<BaseParam, int> ChosenRelicStats
+        public IEnumerable<Tuple<EquipSlot, BaseParam, int>> ChosenRelicStats
         {
             get
             {
@@ -294,7 +294,10 @@ namespace FFXIVBisSolver
                             kv => kv.Key.Value > 0 &&
                                   ChosenGear.Contains((Equipment) kv.Value[1]) &&
                                   RelicCaps.ContainsKey((Equipment) kv.Value[1]))
-                        .ToDictionary(kv => (BaseParam) kv.Value[2], kv => Convert.ToInt32(kv.Key.Value));
+                        .Select(
+                            kv =>
+                                Tuple.Create((EquipSlot) kv.Value[0], (BaseParam) kv.Value[2],
+                                    Convert.ToInt32(kv.Key.Value)));
             }
         }
 

@@ -1,19 +1,152 @@
 jobConfigs:
-  Bard:
+  PLD:
     weights:
-      Physical Damage: 16.824000000000002
-      Dexterity: 1
-      Skill Speed: 0.23300000000000001
-      Determination: 0.215
-      Critical Hit Rate: 0.36599999999999999
+      Physical Damage: 26.523
+      Strength: 1
+      Vitality: 1
+      Critical Hit Rate: 0.541
+      Determination: 0.396
+      Skill Speed: 0.274
     statRequirements:
       Accuracy: 699
-    baseStats:
-      Dexterity: 299
-      Accuracy: 354
-      Critical Hit Rate: 354
-      Determination: 218
-      Skill Speed: 354
-relicConfig:
-  relicCaps:
-    275: 284
+
+  WAR:
+    weights:
+      Physical Damage: 27.095
+      Strength: 1
+      Vitality: 1
+      Critical Hit Rate: 0.546
+      Determination: 0.387
+      Skill Speed: 0.350
+    statRequirements:
+      Accuracy: 699
+      Skill Speed: 550
+
+  DRK:
+    weights:
+      Physical Damage: 26.547
+      Strength: 1
+      Vitality: 1
+      Critical Hit Rate: 0.530
+      Determination: 0.380
+      Skill Speed: 0.315
+      Parry: 0.011
+    statRequirements:
+      Accuracy: 699
+
+  DRG:
+    weights:
+      Physical Damage: 14.956
+      Strength: 1
+      Critical Hit Rate: 0.279
+      Determination: 0.207
+      Skill Speed: 0.170
+    statRequirements:
+      Accuracy: 699
+
+  MNK:
+    weights:
+      Physical Damage: 15.459
+      Strength: 1
+      Critical Hit Rate: 0.297
+      Determination: 0.212
+      Skill Speed: 0.173
+    statRequirements:
+      Accuracy: 699
+
+  NIN:
+    weights:
+      Physical Damage: 15.195
+      Dexterity: 1
+      Critical Hit Rate: 0.282
+      Determination: 0.210
+      Skill Speed: 0.141
+    statRequirements:
+      Accuracy: 699
+
+  BRD:
+    weights:
+      Physical Damage: 16.824
+      Dexterity: 1
+      Skill Speed: 0.233
+      Determination: 0.215
+      Critical Hit Rate: 0.366
+    statRequirements:
+      Accuracy: 699
+
+  MCH:
+    weights:
+      Physical Damage: 13.459
+      Dexterity: 1
+      Skill Speed: 0.168
+      Determination: 0.166
+      Critical Hit Rate: 0.295
+    statRequirements:
+      Accuracy: 699
+
+  BLM:
+    weights:
+      Magic Damage: 11.884
+      Intelligence: 1
+      Critical Hit Rate: 0.256
+      Determination: 0.206
+      Spell Speed: 0.283
+    statRequirements:
+      Accuracy: 593
+
+  SMN:
+    weights:
+      Magic Damage: 11.835
+      Intelligence: 1
+      Critical Hit Rate: 0.287
+      Determination: 0.192
+      Spell Speed: 0.195
+    statRequirements:
+      Accuracy: 593
+
+  SCH:
+    weights:
+      Magic Damage: 9.128
+      Mind: 1
+      Critical Hit Rate: 0.266
+      Determination: 0.190
+      Spell Speed: 0.366
+    statRequirements:
+      Accuracy: 593
+  
+  WHM:
+    weights:
+      Magic Damage: 9.128
+      Mind: 1
+      Critical Hit Rate: 0.282
+      Determination: 0.159
+      Spell Speed: 0.135
+    statRequirements:
+      Accuracy: 593
+
+  AST:
+    weights:
+      Magic Damage: 8.732
+      Mind: 1
+      Critical Hit Rate: 0.204
+      Determination: 0.325
+      Spell Speed: 0.178
+    statRequirements:
+      Accuracy: 593
+
+
+relicCaps:
+  275: 284
+
+baseStats:
+  Strength: 283
+  Dexterity: 298
+  Vitality: 210
+  Piety: 230
+  Intelligence: 297
+  Mind: 299
+  Accuracy: 354
+  Critical Hit Rate: 354
+  Determination: 218
+  Skill Speed: 354
+  Spell Speed: 354

@@ -116,6 +116,9 @@
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
+    <None Include="config.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="documentation.zip" />
     <None Include="OptimizationConfigSection.csd.xsd">
       <SubType>Designer</SubType>
