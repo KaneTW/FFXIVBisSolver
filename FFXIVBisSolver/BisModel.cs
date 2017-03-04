@@ -136,8 +136,7 @@ namespace FFXIVBisSolver
                                     Model.AddConstraint(
                                         Expression.Sum(
                                             MateriaChoices.Where(m => MainStats.Contains(m.Key.BaseParam.Name))
-                                                .Select(m => materia[s, e, m.Key])) <=
-                                        e.FreeMateriaSlots + OvermeldThreshold,
+                                                .Select(m => materia[s, e, m.Key])) <= e.FreeMateriaSlots,
                                         $"restrict advanced melding for mainstat materia to amount of slots in {e} in {s}");
                                 }
                                 if (MateriaChoices.Any(m => !m.Value))
@@ -169,7 +168,11 @@ namespace FFXIVBisSolver
                                     $"cap stats using {e}'s meld cap for {bp} in slot {s}");
 
                                 var maxRegularMat = matGrp.MaxBy(f => f.Key.Value).Key;
-                                var maxAdvancedMat = matGrp.Where(m => m.Value).MaxBy(f => f.Key.Value).Key;
+                                MateriaItem maxAdvancedMat = maxRegularMat;
+                                if (e.IsAdvancedMeldingPermitted)
+                                {
+                                    maxAdvancedMat = matGrp.Where(m => m.Value).MaxBy(f => f.Key.Value).Key;
+                                }
 
                                 // need hash-set here for uniqueness
                                 Model.AddConstraint(
