@@ -1,0 +1,19 @@
+jobConfigs:
+  Bard:
+    weights:
+      Physical Damage: 16.824000000000002
+      Dexterity: 1
+      Skill Speed: 0.23300000000000001
+      Determination: 0.215
+      Critical Hit Rate: 0.36599999999999999
+    statRequirements:
+      Accuracy: 699
+    baseStats:
+      Dexterity: 299
+      Accuracy: 354
+      Critical Hit Rate: 354
+      Determination: 218
+      Skill Speed: 354
+relicConfig:
+  relicCaps:
+    275: 284
