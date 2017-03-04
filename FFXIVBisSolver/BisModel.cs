@@ -16,6 +16,17 @@ namespace FFXIVBisSolver
     {
         private const int MaxMateriaSlots = 5;
 
+        private readonly string[] MainStats =
+        {
+            "Vitality",
+            "Strength",
+            "Dexterity",
+            "Vitality",
+            "Intelligence",
+            "Mind",
+            "Piety"
+        };
+
         /// <summary>
         ///     Creates a new BiS solver model.
         /// </summary>
@@ -118,13 +129,27 @@ namespace FFXIVBisSolver
                                 Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= totalSlots*gv,
                                 $"restrict total materia amount to amount permitted for {e} in {s}");
 
-                            if (e.IsAdvancedMeldingPermitted && MateriaChoices.Any(m => !m.Value))
+                            if (e.IsAdvancedMeldingPermitted)
                             {
-                                Model.AddConstraint(
-                                    Expression.Sum(MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
-                                    e.FreeMateriaSlots + OvermeldThreshold,
-                                    $"restrict regular materia amount to amount permitted for {e} in {s}");
+                                if (MateriaChoices.Any(m => MainStats.Contains(m.Key.BaseParam.Name)))
+                                {
+                                    Model.AddConstraint(
+                                        Expression.Sum(
+                                            MateriaChoices.Where(m => MainStats.Contains(m.Key.BaseParam.Name))
+                                                .Select(m => materia[s, e, m.Key])) <=
+                                        e.FreeMateriaSlots + OvermeldThreshold,
+                                        $"restrict advanced melding for mainstat materia to amount of slots in {e} in {s}");
+                                }
+                                if (MateriaChoices.Any(m => !m.Value))
+                                {
+                                    Model.AddConstraint(
+                                        Expression.Sum(
+                                            MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
+                                        e.FreeMateriaSlots + OvermeldThreshold,
+                                        $"restrict regular materia amount to amount permitted for {e} in {s}");
+                                }
                             }
+
 
                             // SIMPLIFICATION: ignoring whether materia fits; doesn't matter anyway
                             foreach (var matGrp in MateriaChoices.GroupBy(m => m.Key.BaseParam))
