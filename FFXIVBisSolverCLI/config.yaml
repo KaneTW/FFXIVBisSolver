@@ -92,7 +92,7 @@ jobConfigs:
       Determination: 0.206
       Spell Speed: 0.283
     statRequirements:
-      Accuracy: 593
+      Accuracy: 592
 
   SMN:
     weights:
@@ -102,7 +102,7 @@ jobConfigs:
       Determination: 0.192
       Spell Speed: 0.195
     statRequirements:
-      Accuracy: 593
+      Accuracy: 592
 
   SCH:
     weights:
@@ -112,7 +112,7 @@ jobConfigs:
       Determination: 0.190
       Spell Speed: 0.366
     statRequirements:
-      Accuracy: 593
+      Accuracy: 592
   
   WHM:
     weights:
