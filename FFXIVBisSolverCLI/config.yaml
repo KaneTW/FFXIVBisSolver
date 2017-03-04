@@ -78,9 +78,9 @@ jobConfigs:
     weights:
       Physical Damage: 13.459
       Dexterity: 1
-      Skill Speed: 0.168
-      Determination: 0.166
-      Critical Hit Rate: 0.295
+      Skill Speed: 0.106
+      Determination: 0.174
+      Critical Hit Rate: 0.210
     statRequirements:
       Accuracy: 699
 
