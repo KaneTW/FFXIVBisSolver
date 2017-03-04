@@ -144,7 +144,7 @@ namespace FFXIVBisSolverCLI
 
                 var materia = items.OfType<MateriaItem>()
                     .ToDictionary(i => i,
-                        i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()) - 1);
+                        i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
 
                 var relicCaps =
                     equip.Where(e => config.RelicCaps.ContainsKey(e.ItemLevel.Key))
