@@ -47,7 +47,7 @@ namespace FFXIVBisSolver
         public BisModel(IDictionary<BaseParam, double> weights, IDictionary<BaseParam, int> statReqs,
             IDictionary<BaseParam, int> baseStats, IEnumerable<Equipment> gearChoices, IEnumerable<FoodItem> foodChoices,
             IDictionary<MateriaItem, bool> materiaChoices, IDictionary<Equipment, int> relicCaps = null,
-            int overmeldThreshold = 0)
+            int overmeldThreshold = 0, int allocStatCap = 35)
         {
             Model = new Model();
 
@@ -83,8 +83,15 @@ namespace FFXIVBisSolver
                 lowerBoundGenerator: x => 0);
             modstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
                 lowerBoundGenerator: x => 0);
+            allocstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+                lowerBoundGenerator: x => 0);
+
+            Model.AddConstraint(Expression.Sum(RelevantStats.Where(bp => MainStats.Contains(bp.Name)).Select(bp => allocstat[bp])) <= allocStatCap, 
+                "cap allocatable stats");
+
             var statExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
             baseStats.ForEach(kv => statExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
+
 
             var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression)stat[bp]);
 
@@ -259,6 +266,11 @@ namespace FFXIVBisSolver
             var objExpr = Expression.EmptyExpression;
             foreach (var bp in RelevantStats)
             {
+                if (MainStats.Contains(bp.Name))
+                {
+                    AddExprToDict(statExprs, bp, allocstat[bp]);
+                }
+
                 Model.AddConstraint(stat[bp] == statExprs[bp], "set collected stat " + bp);
                 Model.AddConstraint(modstat[bp] <= foodExprs[bp], "relative food bonuses for " + bp);
 
@@ -288,11 +300,13 @@ namespace FFXIVBisSolver
 
         public VariableCollection<BaseParam> stat { get; }
         public VariableCollection<BaseParam> modstat { get; }
+        public VariableCollection<BaseParam> allocstat { get; }
         public VariableCollection<EquipSlot, Equipment> gear { get; }
         public VariableCollection<FoodItem> food { get; }
         public VariableCollection<FoodItem, BaseParam> foodcap { get; }
         public VariableCollection<EquipSlot, Equipment, MateriaItem> materia { get; }
         public VariableCollection<EquipSlot, Equipment, BaseParam> cap { get; }
+        
 
         public IEnumerable<Equipment> ChosenGear
         {
@@ -335,23 +349,18 @@ namespace FFXIVBisSolver
             }
         }
 
-        public Dictionary<BaseParam, int> ResultGearStats
+        private Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
         {
-            get
-            {
-                return VarCollToDict(stat)
-                    .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
-            }
+            return VarCollToDict(stat)
+                .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
+
         }
 
-        public Dictionary<BaseParam, int> ResultTotalStats
-        {
-            get
-            {
-                return VarCollToDict(modstat)
-                    .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
-            }
-        }
+        public Dictionary<BaseParam, int> ResultGearStats => GetResultStat(stat);
+
+        public Dictionary<BaseParam, int> ResultTotalStats => GetResultStat(modstat);
+
+        public Dictionary<BaseParam, int> ResultAllocatableStats => GetResultStat(allocstat);
 
         public bool IsSolved { get; private set; }
 

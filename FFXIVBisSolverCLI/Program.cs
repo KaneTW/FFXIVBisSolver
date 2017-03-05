@@ -194,10 +194,12 @@ namespace FFXIVBisSolverCLI
                     if (model.ChosenRelicStats.Any())
                     {
                         Console.WriteLine("Relic stats: ");
-                        model.ChosenRelicStats.ForEach(kv => Console.WriteLine(kv));
+                        model.ChosenRelicStats.ForEach(Console.WriteLine);
                     }
                     Console.WriteLine("Food: ");
                     Console.WriteLine(model.ChosenFood);
+                    Console.WriteLine("Allocated stats: ");
+                    model.ResultAllocatableStats.ForEach(kv => Console.WriteLine(kv));
                     Console.WriteLine("Result stats with food:");
                     model.ResultTotalStats.ForEach(kv => Console.WriteLine(kv));
                     Console.WriteLine($"Result stat weight: {model.Model.Objectives.First().Expression.Evaluate(solution.VariableValues)}");

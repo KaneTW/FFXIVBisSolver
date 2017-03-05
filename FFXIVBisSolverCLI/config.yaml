@@ -139,12 +139,12 @@ relicCaps:
   275: 284
 
 baseStats:
-  Strength: 283
-  Dexterity: 298
-  Vitality: 210
+  Strength: 248
+  Dexterity: 263
+  Vitality: 228
   Piety: 230
-  Intelligence: 297
-  Mind: 299
+  Intelligence: 262
+  Mind: 264
   Accuracy: 354
   Critical Hit Rate: 354
   Determination: 218
