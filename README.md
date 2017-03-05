@@ -4,7 +4,7 @@ A BiS solver that takes materia and meld caps into account. Simple CLI interface
 
 Documentation
 -------------
-Check the [wiki](https://github.com/KaneTW/FFXIVBisSolver/wiki)
+Check the [wiki](https://github.com/KaneTW/FFXIVBisSolver/wiki) --- also includes a tutorial for people unexperienced with CLI interfaces.
 
 Building
 --------
