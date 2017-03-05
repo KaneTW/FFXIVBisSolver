@@ -151,7 +151,6 @@ namespace FFXIVBisSolverCLI
                     }
                 }
 
-
                 using (var scope = new ModelScope())
                 {
                     var model = new BisModel(solverConfig, classJob,
@@ -175,22 +174,23 @@ namespace FFXIVBisSolverCLI
                     var solution = solver.Solve(model.Model);
                     model.ApplySolution(solution);
                     Console.WriteLine("Gear: ");
-                    model.ChosenGear.ForEach(Console.WriteLine);
+                    model.ChosenGear.ForEach(kv => Console.WriteLine("\t" + kv.EquipSlotCategory.PossibleSlots.ElementAt(0) + ": " + kv));
                     Console.WriteLine("Materia: ");
-                    model.ChosenMateria.ForEach(Console.WriteLine);
+                    model.ChosenMateria.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + ": " + kv.Item2 + ",\n\t\t - Materia: " + kv.Item3 + "\n\t\t\t   Amount: " + kv.Item4));
+                    //Console.WriteLine(model.ChosenMateria.ElementAt(0).Item2);
                     if (model.ChosenRelicStats.Any())
                     {
                         Console.WriteLine("Relic distribution: ");
                         model.ChosenRelicDistribution.ForEach(Console.WriteLine);
                         Console.WriteLine("Relic stats: ");
-                        model.ChosenRelicStats.ForEach(Console.WriteLine);
+                        model.ChosenRelicStats.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + " - " + kv.Item2 + ": " + kv.Item3));
                     }
                     Console.WriteLine("Food: ");
-                    Console.WriteLine(model.ChosenFood);
+                    Console.WriteLine("\t" + model.ChosenFood);
                     Console.WriteLine("Allocated stats: ");
-                    model.ResultAllocatableStats.ForEach(kv => Console.WriteLine(kv));
+                    model.ResultAllocatableStats.ForEach(kv => Console.WriteLine("\t" + kv.Key + ": " + kv.Value));
                     Console.WriteLine("Result stats with food:");
-                    model.ResultTotalStats.ForEach(kv => Console.WriteLine(kv));
+                    model.ResultTotalStats.ForEach(kv => Console.WriteLine("\t" + kv.Key + ": " + kv.Value));
                     Console.WriteLine($"Result stat weight: {model.ResultWeight}");
                 }
 
