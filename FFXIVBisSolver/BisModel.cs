@@ -350,7 +350,8 @@ namespace FFXIVBisSolver
                         .Where(
                             kv => kv.Key.Value > 0 &&
                                   ChosenGear.Contains((Equipment) kv.Value[1]) &&
-                                  RelicCaps.ContainsKey((Equipment) kv.Value[1]))
+                                  RelicCaps.ContainsKey((Equipment) kv.Value[1]) &&
+                                  ((Equipment) kv.Value[1]).FreeMateriaSlots == 0) //TODO: make this a IsRelic extension method
                         .Select(
                             kv =>
                                 Tuple.Create((EquipSlot) kv.Value[0], (BaseParam) kv.Value[2],
@@ -358,7 +359,7 @@ namespace FFXIVBisSolver
             }
         }
 
-        private Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
+        private static Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
         {
             return VarCollToDict(stat)
                 .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
