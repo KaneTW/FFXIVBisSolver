@@ -44,10 +44,12 @@ namespace FFXIVBisSolver
         ///     Extend the overmelding threshold --- i.e. if you set overmeldThreshold to n, materia
         ///     from materiaChoices that isn't normally allowed in advanced melds can be used up to n times in advanced meld
         /// </param>
+        /// <param name="allocStatCap">Cap for allocatable stats. Default is 35</param>
+        /// <param name="maximizeUnweightedValues">Maximize unweighted values with a small weight (1e-5)</param>
         public BisModel(IDictionary<BaseParam, double> weights, IDictionary<BaseParam, int> statReqs,
             IDictionary<BaseParam, int> baseStats, IEnumerable<Equipment> gearChoices, IEnumerable<FoodItem> foodChoices,
             IDictionary<MateriaItem, bool> materiaChoices, IDictionary<Equipment, int> relicCaps = null,
-            int overmeldThreshold = 0, int allocStatCap = 35)
+            int overmeldThreshold = 0, int allocStatCap = 35, bool maximizeUnweightedValues = true)
         {
             Model = new Model();
 
@@ -57,8 +59,9 @@ namespace FFXIVBisSolver
             FoodChoices = foodChoices.ToList();
             RelicCaps = relicCaps;
             OvermeldThreshold = overmeldThreshold;
+            MaximizeUnweightedValues = maximizeUnweightedValues;
 
-            // collect stats we care about
+                // collect stats we care about
             RelevantStats = Weights.Keys.Union(StatRequirements.Keys).ToList();
 
 
@@ -281,11 +284,17 @@ namespace FFXIVBisSolver
 
                 if (StatRequirements.ContainsKey(bp))
                 {
+                    if (MaximizeUnweightedValues && !Weights.ContainsKey(bp))
+                    {
+                        DummyObjective += modstat[bp] * 1e-5;
+                    }
                     Model.AddConstraint(modstat[bp] >= StatRequirements[bp], "satisfy stat requirement for " + bp);
                 }
             }
-            Model.AddObjective(new Objective(objExpr, "stat weight", ObjectiveSense.Maximize), "stat weight");
+            Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize), "stat weight");
         }
+
+        public bool MaximizeUnweightedValues { get; }
 
         public Model Model { get; }
         public IDictionary<BaseParam, double> Weights { get; }
@@ -356,11 +365,15 @@ namespace FFXIVBisSolver
 
         }
 
+        private Expression DummyObjective { get; set; } = Expression.EmptyExpression;
+
         public Dictionary<BaseParam, int> ResultGearStats => GetResultStat(stat);
 
         public Dictionary<BaseParam, int> ResultTotalStats => GetResultStat(modstat);
 
         public Dictionary<BaseParam, int> ResultAllocatableStats => GetResultStat(allocstat);
+
+        public double ResultWeight { get; private set; }
 
         public bool IsSolved { get; private set; }
 
@@ -398,6 +411,7 @@ namespace FFXIVBisSolver
 
             IsSolved = true;
             Model.VariableCollections.ForEach(vc => vc.SetVariableValues(sol.VariableValues));
+            ResultWeight = (Model.Objectives.First().Expression - DummyObjective).Evaluate(sol.VariableValues);
         }
 
         private static Dictionary<Variable, object[]> VarCollToDict(IVariableCollection coll)

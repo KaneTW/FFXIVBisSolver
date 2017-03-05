@@ -62,6 +62,9 @@ namespace FFXIVBisSolverCLI
             var maxOvermeldTierOpt = cliApp.Option("-T |--max-overmeld-tier <tier>",
                 "The max tier of materia allowed for overmelds", CommandOptionType.SingleValue);
 
+            var noMaximizeUnweightedOpt = cliApp.Option("--no-maximize-unweighted",
+                "Choose to disable maximizing unweighted stats (usually accuracy). Shouldn't be needed.", CommandOptionType.NoValue);
+
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)", CommandOptionType.SingleValue);
 
             var debugOpt = cliApp.Option("-d |--debug", "Print the used models in the current directory as model.lp",
@@ -173,13 +176,14 @@ namespace FFXIVBisSolverCLI
                 using (var scope = new ModelScope())
                 {
                     var model = new BisModel(jobConfig.Weights, jobConfig.StatRequirements, config.BaseStats,
-                        equip, food, materia, relicCaps);
+                        equip, food, materia, relicCaps, maximizeUnweightedValues: !noMaximizeUnweightedOpt.HasValue());
 
                     if (debugOpt.HasValue())
                     {
                         using (var f = new FileStream("model.lp", FileMode.Create))
                         {
-                            model.Model.Objective.Expression = model.Model.Objective.Expression.Normalize();
+                            var obj = model.Model.Objectives.First();
+                            obj.Expression = obj.Expression.Normalize();
                             model.Model.Constraints.ForEach(c => c.Expression = c.Expression.Normalize());
                             model.Model.Write(f, FileType.LP);
                         }
@@ -202,7 +206,7 @@ namespace FFXIVBisSolverCLI
                     model.ResultAllocatableStats.ForEach(kv => Console.WriteLine(kv));
                     Console.WriteLine("Result stats with food:");
                     model.ResultTotalStats.ForEach(kv => Console.WriteLine(kv));
-                    Console.WriteLine($"Result stat weight: {model.Model.Objectives.First().Expression.Evaluate(solution.VariableValues)}");
+                    Console.WriteLine($"Result stat weight: {model.ResultWeight}");
                 }
 
                 return 0;
