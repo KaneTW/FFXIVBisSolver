@@ -61,6 +61,7 @@ namespace FFXIVBisSolverCLI
         {
             XivCollection = coll;
         }
+
         public XivCollection XivCollection { get; }
         public abstract bool Accepts(Type type);
         public abstract object ReadYaml(IParser parser, Type type);

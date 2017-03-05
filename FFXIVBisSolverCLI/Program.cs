@@ -2,13 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Microsoft.Extensions.CommandLineUtils;
-using YamlDotNet;
-
 using FFXIVBisSolver;
+using Microsoft.Extensions.CommandLineUtils;
 using OPTANO.Modeling.Common;
 using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
@@ -21,7 +16,6 @@ using SaintCoinach.Xiv;
 using SaintCoinach.Xiv.Items;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using YamlDotNet.Serialization.ObjectFactories;
 
 namespace FFXIVBisSolverCLI
 {
@@ -36,9 +30,8 @@ namespace FFXIVBisSolverCLI
     {
         public Dictionary<BaseParam, double> Weights { get; set; }
         public Dictionary<BaseParam, int> StatRequirements { get; set; }
-        
     }
-    
+
     public class Program
     {
         //TODO: make this more pretty
@@ -63,9 +56,11 @@ namespace FFXIVBisSolverCLI
                 "The max tier of materia allowed for overmelds", CommandOptionType.SingleValue);
 
             var noMaximizeUnweightedOpt = cliApp.Option("--no-maximize-unweighted",
-                "Choose to disable maximizing unweighted stats (usually accuracy). Shouldn't be needed.", CommandOptionType.NoValue);
+                "Choose to disable maximizing unweighted stats (usually accuracy). Shouldn't be needed.",
+                CommandOptionType.NoValue);
 
-            var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)", CommandOptionType.SingleValue);
+            var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)",
+                CommandOptionType.SingleValue);
 
             var debugOpt = cliApp.Option("-d |--debug", "Print the used models in the current directory as model.lp",
                 CommandOptionType.NoValue);
@@ -96,7 +91,7 @@ namespace FFXIVBisSolverCLI
                     .WithTypeConverter(new ClassJobConverter(xivColl))
                     .WithNamingConvention(new CamelCaseNamingConvention())
                     .Build();
-                
+
                 AppConfig config = null;
 
                 using (var s = new FileStream(configOpt.HasValue() ? configOpt.Value() : "config.yaml", FileMode.Open))
@@ -108,11 +103,11 @@ namespace FFXIVBisSolverCLI
 
                 var jobConfig = config.JobConfigs[classJob];
 
-                List<Item> items = xivColl.GetSheet<Item>().ToList();
+                var items = xivColl.GetSheet<Item>().ToList();
 
                 if (excludedOpt.HasValue())
                 {
-                    List<int> excludedIds = new List<int>();
+                    var excludedIds = new List<int>();
                     foreach (var excluded in excludedOpt.Values)
                     {
                         var id = int.Parse(excluded);
@@ -131,7 +126,7 @@ namespace FFXIVBisSolverCLI
                 }
 
                 var equip = items.OfType<Equipment>().Where(e => e.ClassJobCategory.ClassJobs.Contains(classJob));
-                
+
                 var maxIlvl = equip.Max(x => x.ItemLevel.Key);
                 if (maxIlvlOpt.HasValue())
                 {
@@ -142,7 +137,6 @@ namespace FFXIVBisSolverCLI
                 if (minIlvlOpt.HasValue())
                 {
                     minIlvl = int.Parse(minIlvlOpt.Value());
-
                 }
 
                 equip = equip.Where(e => e.ItemLevel.Key >= minIlvl && e.ItemLevel.Key <= maxIlvl).ToList();

@@ -6,7 +6,6 @@ using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
 using OPTANO.Modeling.Optimization.Interfaces;
 using OPTANO.Modeling.Optimization.Solver;
-using OPTANO.Modeling.Optimization.Solver.Gurobi;
 using SaintCoinach.Xiv;
 using SaintCoinach.Xiv.Items;
 
@@ -61,7 +60,7 @@ namespace FFXIVBisSolver
             OvermeldThreshold = overmeldThreshold;
             MaximizeUnweightedValues = maximizeUnweightedValues;
 
-                // collect stats we care about
+            // collect stats we care about
             RelevantStats = Weights.Keys.Union(StatRequirements.Keys).ToList();
 
 
@@ -74,8 +73,9 @@ namespace FFXIVBisSolver
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
                 type: VariableType.Binary);
             food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary);
-            foodcap = new VariableCollection<FoodItem,BaseParam>(Model, FoodChoices, RelevantStats, type: VariableType.Integer,
-                lowerBoundGenerator: (x,b) => 0);
+            foodcap = new VariableCollection<FoodItem, BaseParam>(Model, FoodChoices, RelevantStats,
+                type: VariableType.Integer,
+                lowerBoundGenerator: (x, b) => 0);
             materia = new VariableCollection<EquipSlot, Equipment, MateriaItem>(Model, allEquipSlots, GearChoices,
                 MateriaChoices.Keys,
                 type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0);
@@ -89,14 +89,16 @@ namespace FFXIVBisSolver
             allocstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
                 lowerBoundGenerator: x => 0);
 
-            Model.AddConstraint(Expression.Sum(RelevantStats.Where(bp => MainStats.Contains(bp.Name)).Select(bp => allocstat[bp])) <= allocStatCap, 
+            Model.AddConstraint(
+                Expression.Sum(RelevantStats.Where(bp => MainStats.Contains(bp.Name)).Select(bp => allocstat[bp])) <=
+                allocStatCap,
                 "cap allocatable stats");
 
             var statExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
             baseStats.ForEach(kv => statExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
 
 
-            var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression)stat[bp]);
+            var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression) stat[bp]);
 
             var bigM = 50*
                        GearChoices.Select(
@@ -170,7 +172,6 @@ namespace FFXIVBisSolver
                                 if (remCap == 0)
                                 {
                                     continue;
-                                    
                                 }
 
                                 // we need to constrain against min(remaining cap, melded materia) to account for stat caps
@@ -179,7 +180,7 @@ namespace FFXIVBisSolver
                                     $"cap stats using {e}'s meld cap for {bp} in slot {s}");
 
                                 var maxRegularMat = matGrp.MaxBy(f => f.Key.Value).Key;
-                                MateriaItem maxAdvancedMat = maxRegularMat;
+                                var maxAdvancedMat = maxRegularMat;
                                 if (e.IsAdvancedMeldingPermitted)
                                 {
                                     maxAdvancedMat = matGrp.Where(m => m.Value).MaxBy(f => f.Key.Value).Key;
@@ -260,7 +261,7 @@ namespace FFXIVBisSolver
                                     $"cap for relative modifier for food {fd} in slot {bp}");
                             }
 
-                            AddExprToDict(foodExprs, bp, foodcap[itm,bp]);
+                            AddExprToDict(foodExprs, bp, foodcap[itm, bp]);
                         }
                     }
                 }
@@ -286,12 +287,13 @@ namespace FFXIVBisSolver
                 {
                     if (MaximizeUnweightedValues && !Weights.ContainsKey(bp))
                     {
-                        DummyObjective += modstat[bp] * 1e-5;
+                        DummyObjective += modstat[bp]*1e-5;
                     }
                     Model.AddConstraint(modstat[bp] >= StatRequirements[bp], "satisfy stat requirement for " + bp);
                 }
             }
-            Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize), "stat weight");
+            Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize),
+                "stat weight");
         }
 
         public bool MaximizeUnweightedValues { get; }
@@ -315,7 +317,7 @@ namespace FFXIVBisSolver
         public VariableCollection<FoodItem, BaseParam> foodcap { get; }
         public VariableCollection<EquipSlot, Equipment, MateriaItem> materia { get; }
         public VariableCollection<EquipSlot, Equipment, BaseParam> cap { get; }
-        
+
 
         public IEnumerable<Equipment> ChosenGear
         {
@@ -351,7 +353,8 @@ namespace FFXIVBisSolver
                             kv => kv.Key.Value > 0 &&
                                   ChosenGear.Contains((Equipment) kv.Value[1]) &&
                                   RelicCaps.ContainsKey((Equipment) kv.Value[1]) &&
-                                  ((Equipment) kv.Value[1]).FreeMateriaSlots == 0) //TODO: make this a IsRelic extension method
+                                  ((Equipment) kv.Value[1]).FreeMateriaSlots == 0)
+                        //TODO: make this a IsRelic extension method
                         .Select(
                             kv =>
                                 Tuple.Create((EquipSlot) kv.Value[0], (BaseParam) kv.Value[2],
@@ -359,14 +362,7 @@ namespace FFXIVBisSolver
             }
         }
 
-        private static Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
-        {
-            return VarCollToDict(stat)
-                .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
-
-        }
-
-        private Expression DummyObjective { get; set; } = Expression.EmptyExpression;
+        private Expression DummyObjective { get; } = Expression.EmptyExpression;
 
         public Dictionary<BaseParam, int> ResultGearStats => GetResultStat(stat);
 
@@ -377,6 +373,12 @@ namespace FFXIVBisSolver
         public double ResultWeight { get; private set; }
 
         public bool IsSolved { get; private set; }
+
+        private static Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
+        {
+            return VarCollToDict(stat)
+                .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
+        }
 
         private static void AddExprToDict<T>(Dictionary<T, Expression> dict, T k, Expression expr)
         {
@@ -393,7 +395,7 @@ namespace FFXIVBisSolver
         }
 
         /// <summary>
-        /// Apply a given solution. IT IS THE USER'S RESPONSIBILITY TO CHECK THAT THE SOLUTION SUCCEEDED.
+        ///     Apply a given solution. IT IS THE USER'S RESPONSIBILITY TO CHECK THAT THE SOLUTION SUCCEEDED.
         /// </summary>
         /// <param name="sol">Given solution. Only feasible solutions are accepted.</param>
         /// <exception cref="ArgumentException">Thrown if a not feasible solution is passed.</exception>
