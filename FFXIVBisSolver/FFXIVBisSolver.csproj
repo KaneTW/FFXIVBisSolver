@@ -71,20 +71,15 @@
   <ItemGroup>
     <Compile Include="BisModel.cs" />
     <Compile Include="Config.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="FoodItem.cs" />
+    <Compile Include="PiecewiseLinearFunction.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="documentation.zip" />
-    <None Include="OptimizationConfigSection.csd.xsd">
-      <SubType>Designer</SubType>
-    </None>
     <None Include="packages.config">
       <SubType>Designer</SubType>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="license.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -86,7 +86,7 @@ namespace FFXIVBisSolverCLI
                 var deserializer = new DeserializerBuilder()
                     .WithTypeConverter(new BaseParamConverter(xivColl))
                     .WithTypeConverter(new ClassJobConverter(xivColl))
-                    .WithTypeConverter(new ItemConverter(xivColl))
+                    .WithTypeConverter(new PiecewiseLinearConverter())
                     .WithNamingConvention(new CamelCaseNamingConvention())
                     .Build();
 

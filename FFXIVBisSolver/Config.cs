@@ -28,7 +28,7 @@ namespace FFXIVBisSolver
     {
         public List<int> Items { get; set; }
         public int StatCap { get; set; }
-        public List<List<int>> ConversionMap{ get; set; }
-        public Dictionary<BaseParam, List<List<int>>> ConversionOverride { get; set; }
+        public PiecewiseLinearFunction ConversionFunction { get; set; }
+        public Dictionary<BaseParam, PiecewiseLinearFunction> ConversionOverride { get; set; }
     }
 }

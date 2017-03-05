@@ -147,12 +147,12 @@ namespace FFXIVBisSolver
 
         public IEnumerable<Equipment> ChosenGear
         {
-            get { return VarCollToDict(gear).Where(kv => kv.Key.Value > 0).Select(kv => (Equipment) kv.Value[1]); }
+            get { return gear.VarCollToDict().Where(kv => kv.Key.Value > 0).Select(kv => (Equipment) kv.Value[1]); }
         }
 
         public FoodItem ChosenFood
         {
-            get { return (FoodItem) VarCollToDict(food).SingleOrDefault(kv => kv.Key.Value > 0).Value[0]; }
+            get { return (FoodItem) food.VarCollToDict().SingleOrDefault(kv => kv.Key.Value > 0).Value[0]; }
         }
 
         public IEnumerable<Tuple<EquipSlot, Equipment, MateriaItem, int>> ChosenMateria
@@ -160,7 +160,7 @@ namespace FFXIVBisSolver
             get
             {
                 return
-                    VarCollToDict(materia)
+                    materia.VarCollToDict()
                         .Where(kv => kv.Key.Value > 0)
                         .Select(
                             kv =>
@@ -173,10 +173,10 @@ namespace FFXIVBisSolver
 
         public IEnumerable<Tuple<EquipSlot, BaseParam, int>> ChosenRelicDistribution => GetRelicStats(relicBase);
 
-        private IEnumerable<Tuple<EquipSlot, BaseParam, int>> GetRelicStats(VariableCollection<EquipSlot,Equipment,BaseParam> dict)
+        private IEnumerable<Tuple<EquipSlot, BaseParam, int>> GetRelicStats(VariableCollection<EquipSlot,Equipment,BaseParam> vc)
         {
             return
-                VarCollToDict(dict)
+                vc.VarCollToDict()
                     .Select(
                         kv =>
                             new
@@ -196,8 +196,9 @@ namespace FFXIVBisSolver
                             Tuple.Create(kv.EquipSlot, kv.BaseParam,
                                 Convert.ToInt32(kv.Variable.Value)));
         }
-        public Dictionary<BaseParam, int> ResultTotalStats => GetResultStat(modstat);
-        public Dictionary<BaseParam, int> ResultAllocatableStats => GetResultStat(allocstat);
+
+        public Dictionary<BaseParam, int> ResultTotalStats => modstat.GetResultStat();
+        public Dictionary<BaseParam, int> ResultAllocatableStats => allocstat.GetResultStat();
         public double ResultWeight { get; private set; }
 
         public bool IsSolved { get; private set; }
@@ -209,7 +210,7 @@ namespace FFXIVBisSolver
             {
                 if (MainStats.Contains(bp.Name))
                 {
-                    AddExprToDict(StatExprs, bp, allocstat[bp]);
+                    StatExprs.AddExprToDict(bp, allocstat[bp]);
                 }
 
                 Model.AddConstraint(stat[bp] == StatExprs[bp], "set collected stat " + bp);
@@ -261,7 +262,7 @@ namespace FFXIVBisSolver
                     // ASSUMPTION: each food provides either a fixed or relative buff for a given base param
                     foreach (var pval in pvals.OfType<ParameterValueFixed>())
                     {
-                        AddExprToDict(FoodExprs, bp, pval.Amount*fv);
+                        FoodExprs.AddExprToDict(bp, pval.Amount*fv);
                     }
 
                     foreach (var pval in pvals.OfType<ParameterValueRelative>())
@@ -277,7 +278,7 @@ namespace FFXIVBisSolver
                                 $"cap for relative modifier for food {fd} in slot {bp}");
                         }
 
-                        AddExprToDict(FoodExprs, bp, foodcap[itm, bp]);
+                        FoodExprs.AddExprToDict(bp, foodcap[itm, bp]);
                     }
                 }
             }
@@ -307,7 +308,7 @@ namespace FFXIVBisSolver
                         e.AllParameters.Where(p => RelevantStats.Contains(p.BaseParam))
                             .ForEach(
                                 p =>
-                                    AddExprToDict(StatExprs, p.BaseParam,
+                                    StatExprs.AddExprToDict(p.BaseParam,
                                         p.Values.Sum(v => ((ParameterValueFixed) v).Amount)*gv));
 
                         // ASSUMPTION: all meldable items have at least one materia slot
@@ -337,7 +338,7 @@ namespace FFXIVBisSolver
                 return;
             }
 
-            var isNonSurjective = config.ConversionMap != null && config.ConversionMap.Any();
+            var isNonSurjective = config.ConversionFunction != null;
 
             Model.AddConstraint(
                 Expression.Sum(RelevantStats.Select(bp => isNonSurjective ? relicBase[s, e, bp] : cap[s, e, bp])) <=
@@ -354,32 +355,20 @@ namespace FFXIVBisSolver
 
                 var cv = cap[s, e, bp];
 
-                var map = config.ConversionMap;
+                var func = config.ConversionFunction;
 
-                if (config.ConversionOverride != null && config.ConversionOverride.ContainsKey(bp) &&
-                    config.ConversionOverride[bp].Any())
+                if (config.ConversionOverride != null && config.ConversionOverride.ContainsKey(bp))
                 {
-                    map = config.ConversionOverride[bp];
+                    func = config.ConversionOverride[bp];
                 }
 
                 if (isNonSurjective)
                 {
-                    //TODO: make this a generic step function thing
-                    var factor = new VariableCollection<int>(Model, map.Select(k => k[0]));
-                    var sos2Vars = map.ToDictionary(kv => factor[kv[0]],
-                        kv => (double) map.IndexOf(kv));
-
-                    AddSOS2(sos2Vars);
-                    Model.AddConstraint(Expression.Sum(sos2Vars.Keys) == 1);
-
-                    Model.AddConstraint(
-                        relicBase[s, e, bp] == Expression.Sum(map.Select(kv => factor[kv[0]]*kv[0])));
-
-                    Model.AddConstraint(cv == Expression.Sum(map.Select(kv => factor[kv[0]]*kv[1])));
+                    func.AddToModel(Model, relicBase[s, e, bp], cv, SolverConfig.SolverSupportsSOS);
                 }
 
                 Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
-                AddExprToDict(StatExprs, bp, cv);
+                StatExprs.AddExprToDict(bp, cv);
                 // SIMPLIFICATION: impossible-to-reach stat values are ignored. Can be handled by using Model.AddAlternativeConstraint(cv <= badVal - 1, cv >= badVal +1, bigM)
             }
         }
@@ -449,67 +438,11 @@ namespace FFXIVBisSolver
                             .Select(m => m.Value*materia[s, e, m])),
                     $"cap stats using used {bp} for {e} in slot {s}");
 
-                AddExprToDict(StatExprs, bp, cv);
+                StatExprs.AddExprToDict(bp, cv);
             }
         }
 
-        private void AddSOS2(Dictionary<Variable, double> vars)
-        {
-            if (SolverConfig.SolverSupportsSOS)
-            {
-                Model.AddSOS2(vars);
-            }
-            else
-            {
-                var ordered = vars.OrderBy(kv => kv.Value).Select(kv => kv.Key).ToList();
-                var range = Enumerable.Range(0, ordered.Count - 1).ToList();
-                var segmentVars = new VariableCollection<int>(Model, range);
-                var binaryVars = new VariableCollection<int>(Model, range, type: VariableType.Binary);
-
-                Model.AddConstraint(Expression.Sum(range.Select(i => binaryVars[i])) == 1);
-                range.ForEach(i => Model.AddConstraint(segmentVars[i] <= binaryVars[i]));
-
-
-                Model.AddConstraint(ordered[0] == binaryVars[0] - segmentVars[0]);
-                Model.AddConstraint(ordered[ordered.Count-1] == (Expression) segmentVars[ordered.Count-2]);
-
-                for (var i = 0; i < ordered.Count; i++)
-                {
-                    var expr = Expression.EmptyExpression;
-                    if (i > 0)
-                    {
-                        expr += segmentVars[i - 1];
-                    }
-
-                    if (i < ordered.Count - 1)
-                    {
-                        expr += binaryVars[i] - segmentVars[i];
-                    }
-
-                    Model.AddConstraint(ordered[i] == expr);
-                }
-            }
-        }
-
-        private static Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
-        {
-            return VarCollToDict(stat)
-                .ToDictionary(kv => (BaseParam) kv.Value[0], kv => Convert.ToInt32(kv.Key.Value));
-        }
-
-        private static void AddExprToDict<T>(Dictionary<T, Expression> dict, T k, Expression expr)
-        {
-            if (dict.ContainsKey(k))
-            {
-                var old = dict[k];
-                dict.Remove(k);
-                dict.Add(k, old + expr);
-            }
-            else
-            {
-                dict.Add(k, expr);
-            }
-        }
+ 
 
         /// <summary>
         ///     Apply a given solution. IT IS THE USER'S RESPONSIBILITY TO CHECK THAT THE SOLUTION SUCCEEDED.
@@ -536,10 +469,6 @@ namespace FFXIVBisSolver
             ResultWeight = (Model.Objectives.First().Expression - DummyObjective).Evaluate(sol.VariableValues);
         }
 
-        private static Dictionary<Variable, object[]> VarCollToDict(IVariableCollection coll)
-        {
-            return coll.Variables.Zip(coll.ExistingIndices, (k, v) => new {Key = k, Value = v})
-                .ToDictionary(x => x.Key, x => x.Value);
-        }
+ 
     }
 }
