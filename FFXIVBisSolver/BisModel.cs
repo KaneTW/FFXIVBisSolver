@@ -45,6 +45,8 @@ namespace FFXIVBisSolver
         /// </param>
         /// <param name="allocStatCap">Cap for allocatable stats. Default is 35</param>
         /// <param name="maximizeUnweightedValues">Maximize unweighted values with a small weight (1e-5)</param>
+        //TODO: this is getting out of hand. need config object asap.
+        //TODO: make model parts pluggable if possible
         public BisModel(IDictionary<BaseParam, double> weights, IDictionary<BaseParam, int> statReqs,
             IDictionary<BaseParam, int> baseStats, IEnumerable<Equipment> gearChoices, IEnumerable<FoodItem> foodChoices,
             IDictionary<MateriaItem, bool> materiaChoices, IDictionary<Equipment, int> relicCaps = null,
@@ -94,11 +96,9 @@ namespace FFXIVBisSolver
                 allocStatCap,
                 "cap allocatable stats");
 
-            var statExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
-            baseStats.ForEach(kv => statExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
-
-
-            var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression) stat[bp]);
+            StatExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
+            FoodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression) stat[bp]);
+            baseStats.ForEach(kv => StatExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
 
             var bigM = 50*
                        GearChoices.Select(
@@ -107,193 +107,11 @@ namespace FFXIVBisSolver
                                    p => p.Values.OfType<ParameterValueFixed>().Select(v => v.Amount).Max())
                                    .Max()).Max();
 
-            foreach (var grp in GearChoices.GroupBy(g => g.EquipSlotCategory))
-            {
-                // if gear is unique, equip it once only.
-                grp.Where(e => e.IsUnique)
-                    .ForEach(
-                        e =>
-                            Model.AddConstraint(Expression.Sum(grp.Key.PossibleSlots.Select(s => gear[s, e])) <= 1,
-                                $"ensure gear uniqueness for {e}"));
+            CreateGearModel();
 
-                // SIMPLIFICATION: we ignore blocked slots
-                foreach (var s in grp.Key.PossibleSlots)
-                {
-                    // choose at most one gear per slot
-                    Model.AddConstraint(Expression.Sum(grp.Select(e => gear[s, e])) <= 1,
-                        $"choose at most one item for slot {s}");
-                    foreach (var e in grp)
-                    {
-                        var gv = gear[s, e];
-                        // ASSUMPTION: all gear choices have fixed parameters
-                        e.AllParameters.Where(p => RelevantStats.Contains(p.BaseParam))
-                            .ForEach(
-                                p =>
-                                    AddExprToDict(statExprs, p.BaseParam,
-                                        p.Values.Sum(v => ((ParameterValueFixed) v).Amount)*gv));
+            CreateFoodModel();
 
-                        // ASSUMPTION: all meldable items have at least one materia slot
-                        // ASSUMPTION: customisable relics are unmeldable
-                        if (MateriaChoices.Any() && e.FreeMateriaSlots > 0)
-                        {
-                            var totalSlots = e.IsAdvancedMeldingPermitted ? MaxMateriaSlots : e.FreeMateriaSlots;
-
-                            Model.AddConstraint(
-                                Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= totalSlots*gv,
-                                $"restrict total materia amount to amount permitted for {e} in {s}");
-
-                            if (e.IsAdvancedMeldingPermitted)
-                            {
-                                if (MateriaChoices.Any(m => MainStats.Contains(m.Key.BaseParam.Name)))
-                                {
-                                    Model.AddConstraint(
-                                        Expression.Sum(
-                                            MateriaChoices.Where(m => MainStats.Contains(m.Key.BaseParam.Name))
-                                                .Select(m => materia[s, e, m.Key])) <= e.FreeMateriaSlots,
-                                        $"restrict advanced melding for mainstat materia to amount of slots in {e} in {s}");
-                                }
-                                if (MateriaChoices.Any(m => !m.Value))
-                                {
-                                    Model.AddConstraint(
-                                        Expression.Sum(
-                                            MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
-                                        e.FreeMateriaSlots + OvermeldThreshold,
-                                        $"restrict regular materia amount to amount permitted for {e} in {s}");
-                                }
-                            }
-
-
-                            // SIMPLIFICATION: ignoring whether materia fits; doesn't matter anyway
-                            foreach (var matGrp in MateriaChoices.GroupBy(m => m.Key.BaseParam))
-                            {
-                                var bp = matGrp.Key;
-
-                                var remCap = e.GetMateriaMeldCap(bp, true);
-                                if (remCap == 0)
-                                {
-                                    continue;
-                                }
-
-                                // we need to constrain against min(remaining cap, melded materia) to account for stat caps
-                                var cv = cap[s, e, bp];
-                                Model.AddConstraint(cv <= remCap*gv,
-                                    $"cap stats using {e}'s meld cap for {bp} in slot {s}");
-
-                                var maxRegularMat = matGrp.MaxBy(f => f.Key.Value).Key;
-                                var maxAdvancedMat = maxRegularMat;
-                                if (e.IsAdvancedMeldingPermitted)
-                                {
-                                    maxAdvancedMat = matGrp.Where(m => m.Value).MaxBy(f => f.Key.Value).Key;
-                                }
-
-                                // need hash-set here for uniqueness
-                                Model.AddConstraint(
-                                    cv <=
-                                    Expression.Sum(
-                                        new HashSet<MateriaItem> {maxRegularMat, maxAdvancedMat}
-                                            .Select<MateriaItem, Term>(
-                                                m => m.Value*materia[s, e, m])),
-                                    $"cap stats using used {bp} for {e} in slot {s}");
-
-                                AddExprToDict(statExprs, bp, cv);
-                            }
-                        }
-                        else if (RelicCaps != null && RelicCaps.ContainsKey(e))
-                        {
-                            var eCap = RelicCaps[e];
-                            Model.AddConstraint(Expression.Sum(RelevantStats.Select(bp => cap[s, e, bp])) <= eCap*gv,
-                                $"total relic cap for {e} in slot {s}");
-                            foreach (var bp in RelevantStats)
-                            {
-                                var remCap = e.GetMateriaMeldCap(bp, true);
-                                if (remCap == 0)
-                                {
-                                    continue;
-                                }
-
-                                var cv = cap[s, e, bp];
-
-                                Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
-                                AddExprToDict(statExprs, bp, cv);
-                                // SIMPLIFICATION: impossible-to-reach stat values are ignored. Can be handled by using Model.AddAlternativeConstraint(cv <= badVal - 1, cv >= badVal +1, bigM)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // avoid trivial constraints
-            if (FoodChoices.Any())
-            {
-                Model.AddConstraint(Expression.Sum(FoodChoices.Select(x => food[x])) <= 1, "use one food only");
-
-                foreach (var itm in FoodChoices)
-                {
-                    var fd = itm.Food;
-                    var fv = food[itm];
-
-                    // SIMPLIFICATION: no one cares about nq food.
-                    foreach (var prm in fd.Parameters)
-                    {
-                        var bp = prm.BaseParam;
-                        if (!RelevantStats.Contains(bp))
-                            continue;
-
-                        var pvals = prm.Values.Where(v => v.Type == ParameterType.Hq).ToList();
-
-                        // easy case, these just behave like normal gear
-                        // ASSUMPTION: each food provides either a fixed or relative buff for a given base param
-                        foreach (var pval in pvals.OfType<ParameterValueFixed>())
-                        {
-                            AddExprToDict(statExprs, bp, pval.Amount*fv);
-                        }
-
-                        foreach (var pval in pvals.OfType<ParameterValueRelative>())
-                        {
-                            // add relative modifier stat[bp]
-                            Model.AddConstraint(foodcap[itm, bp] <= pval.Amount*stat[bp],
-                                $"relative modifier for food {fd} in slot {bp}}}");
-
-                            var limited = pval as ParameterValueRelativeLimited;
-                            if (limited != null)
-                            {
-                                Model.AddConstraint(foodcap[itm, bp] <= limited.Maximum*fv,
-                                    $"cap for relative modifier for food {fd} in slot {bp}");
-                            }
-
-                            AddExprToDict(foodExprs, bp, foodcap[itm, bp]);
-                        }
-                    }
-                }
-            }
-
-            var objExpr = Expression.EmptyExpression;
-            foreach (var bp in RelevantStats)
-            {
-                if (MainStats.Contains(bp.Name))
-                {
-                    AddExprToDict(statExprs, bp, allocstat[bp]);
-                }
-
-                Model.AddConstraint(stat[bp] == statExprs[bp], "set collected stat " + bp);
-                Model.AddConstraint(modstat[bp] <= foodExprs[bp], "relative food bonuses for " + bp);
-
-                if (Weights.ContainsKey(bp))
-                {
-                    objExpr += Weights[bp]*modstat[bp];
-                }
-
-                if (StatRequirements.ContainsKey(bp))
-                {
-                    if (MaximizeUnweightedValues && !Weights.ContainsKey(bp))
-                    {
-                        DummyObjective += modstat[bp]*1e-5;
-                    }
-                    Model.AddConstraint(modstat[bp] >= StatRequirements[bp], "satisfy stat requirement for " + bp);
-                }
-            }
-            Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize),
-                "stat weight");
+            CreateObjective();
         }
 
         public bool MaximizeUnweightedValues { get; }
@@ -317,6 +135,10 @@ namespace FFXIVBisSolver
         public VariableCollection<FoodItem, BaseParam> foodcap { get; }
         public VariableCollection<EquipSlot, Equipment, MateriaItem> materia { get; }
         public VariableCollection<EquipSlot, Equipment, BaseParam> cap { get; }
+
+        private Expression DummyObjective { get; set; } = Expression.EmptyExpression;
+        private Dictionary<BaseParam, Expression> StatExprs { get; }
+        private Dictionary<BaseParam, Expression> FoodExprs { get; }
 
 
         public IEnumerable<Equipment> ChosenGear
@@ -362,17 +184,229 @@ namespace FFXIVBisSolver
             }
         }
 
-        private Expression DummyObjective { get; } = Expression.EmptyExpression;
 
         public Dictionary<BaseParam, int> ResultGearStats => GetResultStat(stat);
-
         public Dictionary<BaseParam, int> ResultTotalStats => GetResultStat(modstat);
-
         public Dictionary<BaseParam, int> ResultAllocatableStats => GetResultStat(allocstat);
-
         public double ResultWeight { get; private set; }
 
         public bool IsSolved { get; private set; }
+
+        private void CreateObjective()
+        {
+            var objExpr = Expression.EmptyExpression;
+            foreach (var bp in RelevantStats)
+            {
+                if (MainStats.Contains(bp.Name))
+                {
+                    AddExprToDict(StatExprs, bp, allocstat[bp]);
+                }
+
+                Model.AddConstraint(stat[bp] == StatExprs[bp], "set collected stat " + bp);
+                Model.AddConstraint(modstat[bp] <= FoodExprs[bp], "relative food bonuses for " + bp);
+
+                if (Weights.ContainsKey(bp))
+                {
+                    objExpr += Weights[bp]*modstat[bp];
+                }
+
+                if (StatRequirements.ContainsKey(bp))
+                {
+                    if (MaximizeUnweightedValues && !Weights.ContainsKey(bp))
+                    {
+                        DummyObjective += modstat[bp]*1e-5;
+                    }
+                    Model.AddConstraint(modstat[bp] >= StatRequirements[bp], "satisfy stat requirement for " + bp);
+                }
+            }
+            Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize),
+                "stat weight");
+        }
+
+        private void CreateFoodModel()
+        {
+            // avoid trivial constraints
+            if (!FoodChoices.Any())
+            {
+                return;
+            }
+
+            Model.AddConstraint(Expression.Sum(FoodChoices.Select(x => food[x])) <= 1, "use one food only");
+
+            foreach (var itm in FoodChoices)
+            {
+                var fd = itm.Food;
+                var fv = food[itm];
+
+                // SIMPLIFICATION: no one cares about nq food.
+                foreach (var prm in fd.Parameters)
+                {
+                    var bp = prm.BaseParam;
+                    if (!RelevantStats.Contains(bp))
+                        continue;
+
+                    var pvals = prm.Values.Where(v => v.Type == ParameterType.Hq).ToList();
+
+                    // easy case, these just behave like normal gear
+                    // ASSUMPTION: each food provides either a fixed or relative buff for a given base param
+                    foreach (var pval in pvals.OfType<ParameterValueFixed>())
+                    {
+                        AddExprToDict(FoodExprs, bp, pval.Amount*fv);
+                    }
+
+                    foreach (var pval in pvals.OfType<ParameterValueRelative>())
+                    {
+                        // add relative modifier stat[bp]
+                        Model.AddConstraint(foodcap[itm, bp] <= pval.Amount*stat[bp],
+                            $"relative modifier for food {fd} in slot {bp}");
+
+                        var limited = pval as ParameterValueRelativeLimited;
+                        if (limited != null)
+                        {
+                            Model.AddConstraint(foodcap[itm, bp] <= limited.Maximum*fv,
+                                $"cap for relative modifier for food {fd} in slot {bp}");
+                        }
+
+                        AddExprToDict(FoodExprs, bp, foodcap[itm, bp]);
+                    }
+                }
+            }
+        }
+
+        private void CreateGearModel()
+        {
+            foreach (var grp in GearChoices.GroupBy(g => g.EquipSlotCategory))
+            {
+                // if gear is unique, equip it once only.
+                grp.Where(e => e.IsUnique)
+                    .ForEach(
+                        e =>
+                            Model.AddConstraint(Expression.Sum(grp.Key.PossibleSlots.Select(s => gear[s, e])) <= 1,
+                                $"ensure gear uniqueness for {e}"));
+
+                // SIMPLIFICATION: we ignore blocked slots
+                foreach (var s in grp.Key.PossibleSlots)
+                {
+                    // choose at most one gear per slot
+                    Model.AddConstraint(Expression.Sum(grp.Select(e => gear[s, e])) <= 1,
+                        $"choose at most one item for slot {s}");
+                    foreach (var e in grp)
+                    {
+                        var gv = gear[s, e];
+                        // ASSUMPTION: all gear choices have fixed parameters
+                        e.AllParameters.Where(p => RelevantStats.Contains(p.BaseParam))
+                            .ForEach(
+                                p =>
+                                    AddExprToDict(StatExprs, p.BaseParam,
+                                        p.Values.Sum(v => ((ParameterValueFixed) v).Amount)*gv));
+
+                        // ASSUMPTION: all meldable items have at least one materia slot
+                        // ASSUMPTION: customisable relics are unmeldable
+                        if (e.FreeMateriaSlots > 0)
+                        {
+                            CreateMateriaModel(s, e);
+                        }
+                        else if (RelicCaps != null && RelicCaps.ContainsKey(e))
+                        {
+                            CreateRelicModel(s, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CreateRelicModel(EquipSlot s, Equipment e)
+        {
+            var gv = gear[s, e];
+            var eCap = RelicCaps[e];
+
+            Model.AddConstraint(Expression.Sum(RelevantStats.Select(bp => cap[s, e, bp])) <= eCap*gv,
+                $"total relic cap for {e} in slot {s}");
+            foreach (var bp in RelevantStats)
+            {
+                var remCap = e.GetMateriaMeldCap(bp, true);
+                if (remCap == 0)
+                {
+                    continue;
+                }
+
+                var cv = cap[s, e, bp];
+
+                Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
+                AddExprToDict(StatExprs, bp, cv);
+                // SIMPLIFICATION: impossible-to-reach stat values are ignored. Can be handled by using Model.AddAlternativeConstraint(cv <= badVal - 1, cv >= badVal +1, bigM)
+            }
+        }
+
+        private void CreateMateriaModel(EquipSlot s, Equipment e)
+        {
+            if (!MateriaChoices.Any())
+            {
+                return;
+            }
+            var gv = gear[s, e];
+            var totalSlots = e.IsAdvancedMeldingPermitted ? MaxMateriaSlots : e.FreeMateriaSlots;
+
+            Model.AddConstraint(
+                Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= totalSlots*gv,
+                $"restrict total materia amount to amount permitted for {e} in {s}");
+
+            if (e.IsAdvancedMeldingPermitted)
+            {
+                if (MateriaChoices.Any(m => MainStats.Contains(m.Key.BaseParam.Name)))
+                {
+                    Model.AddConstraint(
+                        Expression.Sum(
+                            MateriaChoices.Where(m => MainStats.Contains(m.Key.BaseParam.Name))
+                                .Select(m => materia[s, e, m.Key])) <= e.FreeMateriaSlots,
+                        $"restrict advanced melding for mainstat materia to amount of slots in {e} in {s}");
+                }
+                if (MateriaChoices.Any(m => !m.Value))
+                {
+                    Model.AddConstraint(
+                        Expression.Sum(
+                            MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
+                        e.FreeMateriaSlots + OvermeldThreshold,
+                        $"restrict regular materia amount to amount permitted for {e} in {s}");
+                }
+            }
+
+
+            // SIMPLIFICATION: ignoring whether materia fits; doesn't matter anyway
+            foreach (var matGrp in MateriaChoices.GroupBy(m => m.Key.BaseParam))
+            {
+                var bp = matGrp.Key;
+
+                var remCap = e.GetMateriaMeldCap(bp, true);
+                if (remCap == 0)
+                {
+                    continue;
+                }
+
+                // we need to constrain against min(remaining cap, melded materia) to account for stat caps
+                var cv = cap[s, e, bp];
+                Model.AddConstraint(cv <= remCap*gv,
+                    $"cap stats using {e}'s meld cap for {bp} in slot {s}");
+
+                var maxRegularMat = matGrp.MaxBy(f => f.Key.Value).Key;
+                var maxAdvancedMat = maxRegularMat;
+                if (e.IsAdvancedMeldingPermitted)
+                {
+                    maxAdvancedMat = matGrp.Where(m => m.Value).MaxBy(f => f.Key.Value).Key;
+                }
+
+                // need hash-set here for uniqueness
+                Model.AddConstraint(
+                    cv <=
+                    Expression.Sum(
+                        new HashSet<MateriaItem> {maxRegularMat, maxAdvancedMat}
+                            .Select<MateriaItem, Term>(
+                                m => m.Value*materia[s, e, m])),
+                    $"cap stats using used {bp} for {e} in slot {s}");
+
+                AddExprToDict(StatExprs, bp, cv);
+            }
+        }
 
         private static Dictionary<BaseParam, int> GetResultStat(VariableCollection<BaseParam> stat)
         {
