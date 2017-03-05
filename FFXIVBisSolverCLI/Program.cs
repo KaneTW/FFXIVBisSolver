@@ -45,7 +45,7 @@ namespace FFXIVBisSolverCLI
             var noMaximizeUnweightedOpt = cliApp.Option("--no-maximize-unweighted",
                 "Choose to disable maximizing unweighted stats (usually accuracy). Shouldn't be needed.",
                 CommandOptionType.NoValue);
-
+            
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)",
                 CommandOptionType.SingleValue);
 
@@ -174,14 +174,15 @@ namespace FFXIVBisSolverCLI
                     var solution = solver.Solve(model.Model);
                     model.ApplySolution(solution);
                     Console.WriteLine("Gear: ");
-                    model.ChosenGear.ForEach(kv => Console.WriteLine("\t" + kv.EquipSlotCategory.PossibleSlots.ElementAt(0) + ": " + kv));
+                    model.ChosenGear.ForEach(
+                        kv =>
+                            Console.WriteLine("\t" + string.Join(" or ", kv.EquipSlotCategory.PossibleSlots.OrderBy(s => s.ToString())) + ": " + kv));
                     Console.WriteLine("Materia: ");
                     model.ChosenMateria.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + ": " + kv.Item2 + ",\n\t\t - Materia: " + kv.Item3 + "\n\t\t\t   Amount: " + kv.Item4));
-                    //Console.WriteLine(model.ChosenMateria.ElementAt(0).Item2);
                     if (model.ChosenRelicStats.Any())
                     {
                         Console.WriteLine("Relic distribution: ");
-                        model.ChosenRelicDistribution.ForEach(Console.WriteLine);
+                        model.ChosenRelicDistribution.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + " - " + kv.Item2 + ": " + kv.Item3));
                         Console.WriteLine("Relic stats: ");
                         model.ChosenRelicStats.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + " - " + kv.Item2 + ": " + kv.Item3));
                     }
