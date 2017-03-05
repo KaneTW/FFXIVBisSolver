@@ -19,19 +19,6 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace FFXIVBisSolverCLI
 {
-    public class AppConfig
-    {
-        public Dictionary<ClassJob, JobConfig> JobConfigs { get; set; }
-        public Dictionary<int, int> RelicCaps { get; set; }
-        public Dictionary<BaseParam, int> BaseStats { get; set; }
-    }
-
-    public class JobConfig
-    {
-        public Dictionary<BaseParam, double> Weights { get; set; }
-        public Dictionary<BaseParam, int> StatRequirements { get; set; }
-    }
-
     public class Program
     {
         //TODO: make this more pretty
@@ -86,22 +73,24 @@ namespace FFXIVBisSolverCLI
                 var realm = new ARealmReversed(xivPathOpt.Value(), Language.English);
                 var xivColl = realm.GameData;
 
+                //TODO: can combine those converters
                 var deserializer = new DeserializerBuilder()
                     .WithTypeConverter(new BaseParamConverter(xivColl))
                     .WithTypeConverter(new ClassJobConverter(xivColl))
+                    .WithTypeConverter(new ItemConverter(xivColl))
                     .WithNamingConvention(new CamelCaseNamingConvention())
                     .Build();
 
-                AppConfig config = null;
+                SolverConfig solverConfig = null;
 
                 using (var s = new FileStream(configOpt.HasValue() ? configOpt.Value() : "config.yaml", FileMode.Open))
                 {
-                    config = deserializer.Deserialize<AppConfig>(new StreamReader(s));
+                    solverConfig = deserializer.Deserialize<SolverConfig>(new StreamReader(s));
                 }
 
-                var classJob = xivColl.GetSheet<ClassJob>().Single(x => x.Abbreviation == jobArg.Value);
+                solverConfig.MaximizeUnweightedValues = !noMaximizeUnweightedOpt.HasValue();
 
-                var jobConfig = config.JobConfigs[classJob];
+                var classJob = xivColl.GetSheet<ClassJob>().Single(x => x.Abbreviation == jobArg.Value);
 
                 var items = xivColl.GetSheet<Item>().ToList();
 
@@ -147,10 +136,6 @@ namespace FFXIVBisSolverCLI
                     .ToDictionary(i => i,
                         i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
 
-                var relicCaps =
-                    equip.Where(e => config.RelicCaps.ContainsKey(e.ItemLevel.Key))
-                        .ToDictionary(e => e, e => config.RelicCaps[e.ItemLevel.Key]);
-
                 //TODO: improve solver handling
                 SolverBase solver = new GLPKSolver();
                 if (solverOpt.HasValue())
@@ -169,17 +154,21 @@ namespace FFXIVBisSolverCLI
 
                 using (var scope = new ModelScope())
                 {
-                    var model = new BisModel(jobConfig.Weights, jobConfig.StatRequirements, config.BaseStats,
-                        equip, food, materia, relicCaps, maximizeUnweightedValues: !noMaximizeUnweightedOpt.HasValue());
+                    var model = new BisModel(solverConfig, classJob,
+                        equip, food, materia);
 
                     if (debugOpt.HasValue())
                     {
+                        var obj = model.Model.Objectives.First();
+                        obj.Expression = obj.Expression.Normalize();
+                        model.Model.Constraints.ForEach(c => c.Expression = c.Expression.Normalize());
                         using (var f = new FileStream("model.lp", FileMode.Create))
                         {
-                            var obj = model.Model.Objectives.First();
-                            obj.Expression = obj.Expression.Normalize();
-                            model.Model.Constraints.ForEach(c => c.Expression = c.Expression.Normalize());
                             model.Model.Write(f, FileType.LP);
+                        }
+                        using (var f = new FileStream("model.mps", FileMode.Create))
+                        {
+                            model.Model.Write(f, FileType.MPS);
                         }
                     }
 
@@ -191,6 +180,8 @@ namespace FFXIVBisSolverCLI
                     model.ChosenMateria.ForEach(Console.WriteLine);
                     if (model.ChosenRelicStats.Any())
                     {
+                        Console.WriteLine("Relic distribution: ");
+                        model.ChosenRelicDistribution.ForEach(Console.WriteLine);
                         Console.WriteLine("Relic stats: ");
                         model.ChosenRelicStats.ForEach(Console.WriteLine);
                     }

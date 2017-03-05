@@ -4,6 +4,7 @@ using SaintCoinach.Xiv;
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.Utilities;
 
 namespace FFXIVBisSolverCLI
 {
@@ -52,6 +53,30 @@ namespace FFXIVBisSolverCLI
         {
             var bp = (BaseParam) value;
             emitter.Emit(new Scalar(bp.Name));
+        }
+    }
+
+    public class ItemConverter : XivConverter
+    {
+        public ItemConverter(XivCollection coll) : base(coll)
+        {
+        }
+
+        public override bool Accepts(Type type)
+        {
+            return type.IsSubclassOf(typeof (Item));
+        }
+
+        public override object ReadYaml(IParser parser, Type type)
+        {
+            var value = TypeConverter.ChangeType<int>(parser.Expect<Scalar>().Value);
+            return XivCollection.GetSheet<Item>()[value];
+        }
+
+        public override void WriteYaml(IEmitter emitter, object value, Type type)
+        {
+            var item = (Item) value;
+            emitter.Emit(new Scalar(item.Key.ToString()));
         }
     }
 

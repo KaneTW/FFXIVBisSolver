@@ -70,6 +70,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BisModel.cs" />
+    <Compile Include="Config.cs" />
     <Compile Include="FoodItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

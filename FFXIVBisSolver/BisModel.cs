@@ -29,41 +29,31 @@ namespace FFXIVBisSolver
         /// <summary>
         ///     Creates a new BiS solver model.
         /// </summary>
-        /// <param name="weights">Stat weights. The higher the weight, the more a stat is desirable</param>
-        /// <param name="statReqs">Minimum amount of stats that must be present in a solution</param>
-        /// <param name="baseStats">Stats of a character without any gear</param>
+        /// <param name="solverConfig">Solver configuration</param>
+        /// <param name="job">Job to solve for</param>
         /// <param name="gearChoices">Gear items to choose from. Keep this small.</param>
         /// <param name="foodChoices">List of food choices. This can be fairly large, it doesn't add much complexity.</param>
         /// <param name="materiaChoices">
         ///     Dictionary of materia choices; set value to true if the materia is allowed for advanced
         ///     melding. The materia with the highest eligible stat value is chosen. (Note that Tier is 0-indexed)
         /// </param>
-        /// <param name="relicCaps">Designates customizable relics. Value of an entry determines the total stat cap.</param>
-        /// <param name="overmeldThreshold">
-        ///     Extend the overmelding threshold --- i.e. if you set overmeldThreshold to n, materia
-        ///     from materiaChoices that isn't normally allowed in advanced melds can be used up to n times in advanced meld
-        /// </param>
-        /// <param name="allocStatCap">Cap for allocatable stats. Default is 35</param>
-        /// <param name="maximizeUnweightedValues">Maximize unweighted values with a small weight (1e-5)</param>
         //TODO: this is getting out of hand. need config object asap.
         //TODO: make model parts pluggable if possible
-        public BisModel(IDictionary<BaseParam, double> weights, IDictionary<BaseParam, int> statReqs,
-            IDictionary<BaseParam, int> baseStats, IEnumerable<Equipment> gearChoices, IEnumerable<FoodItem> foodChoices,
-            IDictionary<MateriaItem, bool> materiaChoices, IDictionary<Equipment, int> relicCaps = null,
-            int overmeldThreshold = 0, int allocStatCap = 35, bool maximizeUnweightedValues = true)
+        public BisModel(SolverConfig solverConfig, ClassJob job,
+            IEnumerable<Equipment> gearChoices, IEnumerable<FoodItem> foodChoices,
+            IDictionary<MateriaItem, bool> materiaChoices)
         {
             Model = new Model();
 
-            StatRequirements = statReqs;
-            Weights = weights;
+            SolverConfig = solverConfig;
+
+            JobConfig = SolverConfig.JobConfigs[job];
+
             GearChoices = gearChoices.ToList();
             FoodChoices = foodChoices.ToList();
-            RelicCaps = relicCaps;
-            OvermeldThreshold = overmeldThreshold;
-            MaximizeUnweightedValues = maximizeUnweightedValues;
-
+            
             // collect stats we care about
-            RelevantStats = Weights.Keys.Union(StatRequirements.Keys).ToList();
+            RelevantStats = JobConfig.Weights.Keys.Union(JobConfig.StatRequirements.Keys).ToList();
 
 
             // we don't care about materia which affect unneeded stats
@@ -83,6 +73,8 @@ namespace FFXIVBisSolver
                 type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0);
             cap = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
                 RelevantStats, type: VariableType.Integer, lowerBoundGenerator: (s, e, b) => 0);
+            relicBase = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
+                RelevantStats, type: VariableType.Integer, lowerBoundGenerator: (s, e, b) => 0);
 
             stat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
                 lowerBoundGenerator: x => 0);
@@ -93,12 +85,12 @@ namespace FFXIVBisSolver
 
             Model.AddConstraint(
                 Expression.Sum(RelevantStats.Where(bp => MainStats.Contains(bp.Name)).Select(bp => allocstat[bp])) <=
-                allocStatCap,
+                SolverConfig.AllocatedStatsCap,
                 "cap allocatable stats");
 
             StatExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
             FoodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression) stat[bp]);
-            baseStats.ForEach(kv => StatExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
+            SolverConfig.BaseStats.ForEach(kv => StatExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
 
             var bigM = 50*
                        GearChoices.Select(
@@ -114,19 +106,18 @@ namespace FFXIVBisSolver
             CreateObjective();
         }
 
-        public bool MaximizeUnweightedValues { get; }
+        
 
         public Model Model { get; }
-        public IDictionary<BaseParam, double> Weights { get; }
-        public IDictionary<BaseParam, int> StatRequirements { get; }
+        public SolverConfig SolverConfig { get; set; }
+        public JobConfig JobConfig { get; }
         public IList<Equipment> GearChoices { get; }
         public IList<FoodItem> FoodChoices { get; }
         public IDictionary<MateriaItem, bool> MateriaChoices { get; }
-        public int OvermeldThreshold { get; }
         public IList<BaseParam> RelevantStats { get; }
-        public IDictionary<Equipment, int> RelicCaps { get; }
 
 
+        //TODO: ok this is getting out of hand
         public VariableCollection<BaseParam> stat { get; }
         public VariableCollection<BaseParam> modstat { get; }
         public VariableCollection<BaseParam> allocstat { get; }
@@ -135,6 +126,8 @@ namespace FFXIVBisSolver
         public VariableCollection<FoodItem, BaseParam> foodcap { get; }
         public VariableCollection<EquipSlot, Equipment, MateriaItem> materia { get; }
         public VariableCollection<EquipSlot, Equipment, BaseParam> cap { get; }
+        public VariableCollection<EquipSlot, Equipment, BaseParam> relicBase { get; }
+
 
         private Expression DummyObjective { get; set; } = Expression.EmptyExpression;
         private Dictionary<BaseParam, Expression> StatExprs { get; }
@@ -165,27 +158,33 @@ namespace FFXIVBisSolver
             }
         }
 
-        public IEnumerable<Tuple<EquipSlot, BaseParam, int>> ChosenRelicStats
+        public IEnumerable<Tuple<EquipSlot, BaseParam, int>> ChosenRelicStats => GetRelicStats(cap);
+
+        public IEnumerable<Tuple<EquipSlot, BaseParam, int>> ChosenRelicDistribution => GetRelicStats(relicBase);
+
+        private IEnumerable<Tuple<EquipSlot, BaseParam, int>> GetRelicStats(VariableCollection<EquipSlot,Equipment,BaseParam> dict)
         {
-            get
-            {
-                return
-                    VarCollToDict(cap)
-                        .Where(
-                            kv => kv.Key.Value > 0 &&
-                                  ChosenGear.Contains((Equipment) kv.Value[1]) &&
-                                  RelicCaps.ContainsKey((Equipment) kv.Value[1]) &&
-                                  ((Equipment) kv.Value[1]).FreeMateriaSlots == 0)
-                        //TODO: make this a IsRelic extension method
-                        .Select(
-                            kv =>
-                                Tuple.Create((EquipSlot) kv.Value[0], (BaseParam) kv.Value[2],
-                                    Convert.ToInt32(kv.Key.Value)));
-            }
+            return
+                VarCollToDict(dict)
+                    .Select(
+                        kv =>
+                            new
+                            {
+                                Variable = kv.Key,
+                                EquipSlot = (EquipSlot) kv.Value[0],
+                                Equipment = (Equipment) kv.Value[1],
+                                BaseParam = (BaseParam) kv.Value[2]
+                            })
+                    .Where(
+                        kv => kv.Variable.Value > 0 &&
+                              ChosenGear.Contains(kv.Equipment) &&
+                              SolverConfig.RelicConfigs.ContainsKey(kv.Equipment.ItemLevel.Key) &&
+                              SolverConfig.RelicConfigs[kv.Equipment.ItemLevel.Key].Items.Contains(kv.Equipment.Key))
+                    .Select(
+                        kv =>
+                            Tuple.Create(kv.EquipSlot, kv.BaseParam,
+                                Convert.ToInt32(kv.Variable.Value)));
         }
-
-
-        public Dictionary<BaseParam, int> ResultGearStats => GetResultStat(stat);
         public Dictionary<BaseParam, int> ResultTotalStats => GetResultStat(modstat);
         public Dictionary<BaseParam, int> ResultAllocatableStats => GetResultStat(allocstat);
         public double ResultWeight { get; private set; }
@@ -205,18 +204,18 @@ namespace FFXIVBisSolver
                 Model.AddConstraint(stat[bp] == StatExprs[bp], "set collected stat " + bp);
                 Model.AddConstraint(modstat[bp] <= FoodExprs[bp], "relative food bonuses for " + bp);
 
-                if (Weights.ContainsKey(bp))
+                if (JobConfig.Weights.ContainsKey(bp))
                 {
-                    objExpr += Weights[bp]*modstat[bp];
+                    objExpr += JobConfig.Weights[bp]*modstat[bp];
                 }
 
-                if (StatRequirements.ContainsKey(bp))
+                if (JobConfig.StatRequirements.ContainsKey(bp))
                 {
-                    if (MaximizeUnweightedValues && !Weights.ContainsKey(bp))
+                    if (SolverConfig.MaximizeUnweightedValues && !JobConfig.Weights.ContainsKey(bp))
                     {
                         DummyObjective += modstat[bp]*1e-5;
                     }
-                    Model.AddConstraint(modstat[bp] >= StatRequirements[bp], "satisfy stat requirement for " + bp);
+                    Model.AddConstraint(modstat[bp] >= JobConfig.StatRequirements[bp], "satisfy stat requirement for " + bp);
                 }
             }
             Model.AddObjective(new Objective(objExpr + DummyObjective, "stat weight", ObjectiveSense.Maximize),
@@ -306,7 +305,7 @@ namespace FFXIVBisSolver
                         {
                             CreateMateriaModel(s, e);
                         }
-                        else if (RelicCaps != null && RelicCaps.ContainsKey(e))
+                        else
                         {
                             CreateRelicModel(s, e);
                         }
@@ -318,10 +317,23 @@ namespace FFXIVBisSolver
         private void CreateRelicModel(EquipSlot s, Equipment e)
         {
             var gv = gear[s, e];
-            var eCap = RelicCaps[e];
 
-            Model.AddConstraint(Expression.Sum(RelevantStats.Select(bp => cap[s, e, bp])) <= eCap*gv,
+            RelicConfig config = null;
+            SolverConfig.RelicConfigs.TryGetValue(e.ItemLevel.Key, out config);
+
+            if (config == null || !config.Items.Contains(e.Key))
+            {
+                return;
+            }
+
+
+            var isConstrained = config.ConversionMap != null && config.ConversionMap.Any();
+
+            Model.AddConstraint(
+                Expression.Sum(RelevantStats.Select(bp => isConstrained ? relicBase[s, e, bp] : cap[s, e, bp])) <=
+                config.StatCap*gv,
                 $"total relic cap for {e} in slot {s}");
+            
             foreach (var bp in RelevantStats)
             {
                 var remCap = e.GetMateriaMeldCap(bp, true);
@@ -331,6 +343,22 @@ namespace FFXIVBisSolver
                 }
 
                 var cv = cap[s, e, bp];
+
+                if (isConstrained)
+                {
+                    //TODO: make this a generic step function thing
+                    var factor = new VariableCollection<int>(Model, config.ConversionMap.Select(k => k[0]));
+                    var sos2Vars = config.ConversionMap.ToDictionary(kv => factor[kv[0]],
+                        kv => (double) config.ConversionMap.IndexOf(kv));
+
+                    Model.AddSOS2(sos2Vars);
+                    Model.AddConstraint(Expression.Sum(sos2Vars.Keys) == 1);
+
+                    Model.AddConstraint(
+                        relicBase[s, e, bp] == Expression.Sum(config.ConversionMap.Select(kv => factor[kv[0]]*kv[0])));
+
+                    Model.AddConstraint(cv == Expression.Sum(config.ConversionMap.Select(kv => factor[kv[0]]*kv[1])));
+                }
 
                 Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
                 AddExprToDict(StatExprs, bp, cv);
@@ -366,7 +394,7 @@ namespace FFXIVBisSolver
                     Model.AddConstraint(
                         Expression.Sum(
                             MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
-                        e.FreeMateriaSlots + OvermeldThreshold,
+                        e.FreeMateriaSlots + SolverConfig.OvermeldThreshold,
                         $"restrict regular materia amount to amount permitted for {e} in {s}");
                 }
             }
@@ -400,8 +428,7 @@ namespace FFXIVBisSolver
                     cv <=
                     Expression.Sum(
                         new HashSet<MateriaItem> {maxRegularMat, maxAdvancedMat}
-                            .Select<MateriaItem, Term>(
-                                m => m.Value*materia[s, e, m])),
+                            .Select(m => m.Value*materia[s, e, m])),
                     $"cap stats using used {bp} for {e} in slot {s}");
 
                 AddExprToDict(StatExprs, bp, cv);
