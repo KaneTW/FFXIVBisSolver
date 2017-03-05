@@ -11,6 +11,7 @@ using YamlDotNet;
 using FFXIVBisSolver;
 using OPTANO.Modeling.Common;
 using OPTANO.Modeling.Optimization;
+using OPTANO.Modeling.Optimization.Enums;
 using OPTANO.Modeling.Optimization.Solver.GLPK;
 using OPTANO.Modeling.Optimization.Solver.Gurobi702;
 using OPTANO.Modeling.Optimization.Solver.Z3;
@@ -62,6 +63,9 @@ namespace FFXIVBisSolverCLI
                 "The max tier of materia allowed for overmelds", CommandOptionType.SingleValue);
 
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)", CommandOptionType.SingleValue);
+
+            var debugOpt = cliApp.Option("-d |--debug", "Print the used models in the current directory as model.lp",
+                CommandOptionType.NoValue);
 
             var jobArg = cliApp.Argument("<job>", "Enter the job abbreviation to solve for");
 
@@ -170,6 +174,17 @@ namespace FFXIVBisSolverCLI
                 {
                     var model = new BisModel(jobConfig.Weights, jobConfig.StatRequirements, config.BaseStats,
                         equip, food, materia, relicCaps);
+
+                    if (debugOpt.HasValue())
+                    {
+                        using (var f = new FileStream("model.lp", FileMode.Create))
+                        {
+                            model.Model.Objective.Expression = model.Model.Objective.Expression.Normalize();
+                            model.Model.Constraints.ForEach(c => c.Expression = c.Expression.Normalize());
+                            model.Model.Write(f, FileType.LP);
+                        }
+                    }
+
                     var solution = solver.Solve(model.Model);
                     model.ApplySolution(solution);
                     Console.WriteLine("Gear: ");

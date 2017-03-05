@@ -71,6 +71,8 @@ namespace FFXIVBisSolver
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
                 type: VariableType.Binary);
             food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary);
+            foodcap = new VariableCollection<FoodItem,BaseParam>(Model, FoodChoices, RelevantStats, type: VariableType.Integer,
+                lowerBoundGenerator: (x,b) => 0);
             materia = new VariableCollection<EquipSlot, Equipment, MateriaItem>(Model, allEquipSlots, GearChoices,
                 MateriaChoices.Keys,
                 type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0);
@@ -84,8 +86,7 @@ namespace FFXIVBisSolver
             var statExprs = RelevantStats.ToDictionary(bp => bp, bp => Expression.EmptyExpression);
             baseStats.ForEach(kv => statExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
 
-            var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => stat[bp] + Expression.EmptyExpression);
-            var foodMaxExprs = RelevantStats.ToDictionary(bp => bp, bp => stat[bp] + Expression.EmptyExpression);
+            var foodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression)stat[bp]);
 
             var bigM = 50*
                        GearChoices.Select(
@@ -238,13 +239,18 @@ namespace FFXIVBisSolver
 
                         foreach (var pval in pvals.OfType<ParameterValueRelative>())
                         {
-                            // collect relative modifiers
-                            AddExprToDict(foodExprs, bp, pval.Amount*stat[bp]);
+                            // add relative modifier stat[bp]
+                            Model.AddConstraint(foodcap[itm, bp] <= pval.Amount*stat[bp],
+                                $"relative modifier for food {fd} in slot {bp}}}");
 
                             var limited = pval as ParameterValueRelativeLimited;
+                            if (limited != null)
+                            {
+                                Model.AddConstraint(foodcap[itm, bp] <= limited.Maximum*fv,
+                                    $"cap for relative modifier for food {fd} in slot {bp}");
+                            }
 
-                            // if the food doesn't have an upper limit, use a big-M constant to relax the constraint
-                            AddExprToDict(foodMaxExprs, bp, limited != null ? limited.Maximum*fv : bigM*fv);
+                            AddExprToDict(foodExprs, bp, foodcap[itm,bp]);
                         }
                     }
                 }
@@ -255,7 +261,6 @@ namespace FFXIVBisSolver
             {
                 Model.AddConstraint(stat[bp] == statExprs[bp], "set collected stat " + bp);
                 Model.AddConstraint(modstat[bp] <= foodExprs[bp], "relative food bonuses for " + bp);
-                Model.AddConstraint(modstat[bp] <= foodMaxExprs[bp], "relative food bonus caps for " + bp);
 
                 if (Weights.ContainsKey(bp))
                 {
@@ -285,6 +290,7 @@ namespace FFXIVBisSolver
         public VariableCollection<BaseParam> modstat { get; }
         public VariableCollection<EquipSlot, Equipment> gear { get; }
         public VariableCollection<FoodItem> food { get; }
+        public VariableCollection<FoodItem, BaseParam> foodcap { get; }
         public VariableCollection<EquipSlot, Equipment, MateriaItem> materia { get; }
         public VariableCollection<EquipSlot, Equipment, BaseParam> cap { get; }
 
