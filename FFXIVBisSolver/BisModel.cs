@@ -337,10 +337,10 @@ namespace FFXIVBisSolver
                 return;
             }
 
-            var isConstrained = config.ConversionMap != null && config.ConversionMap.Any();
+            var isNonSurjective = config.ConversionMap != null && config.ConversionMap.Any();
 
             Model.AddConstraint(
-                Expression.Sum(RelevantStats.Select(bp => isConstrained ? relicBase[s, e, bp] : cap[s, e, bp])) <=
+                Expression.Sum(RelevantStats.Select(bp => isNonSurjective ? relicBase[s, e, bp] : cap[s, e, bp])) <=
                 config.StatCap*gv,
                 $"total relic cap for {e} in slot {s}");
             
@@ -362,20 +362,20 @@ namespace FFXIVBisSolver
                     map = config.ConversionOverride[bp];
                 }
 
-                if (isConstrained)
+                if (isNonSurjective)
                 {
                     //TODO: make this a generic step function thing
-                    var factor = new VariableCollection<int>(Model, config.ConversionMap.Select(k => k[0]));
-                    var sos2Vars = config.ConversionMap.ToDictionary(kv => factor[kv[0]],
-                        kv => (double) config.ConversionMap.IndexOf(kv));
+                    var factor = new VariableCollection<int>(Model, map.Select(k => k[0]));
+                    var sos2Vars = map.ToDictionary(kv => factor[kv[0]],
+                        kv => (double) map.IndexOf(kv));
 
-                    Model.AddSOS2(sos2Vars);
+                    AddSOS2(sos2Vars);
                     Model.AddConstraint(Expression.Sum(sos2Vars.Keys) == 1);
 
                     Model.AddConstraint(
-                        relicBase[s, e, bp] == Expression.Sum(config.ConversionMap.Select(kv => factor[kv[0]]*kv[0])));
+                        relicBase[s, e, bp] == Expression.Sum(map.Select(kv => factor[kv[0]]*kv[0])));
 
-                    Model.AddConstraint(cv == Expression.Sum(config.ConversionMap.Select(kv => factor[kv[0]]*kv[1])));
+                    Model.AddConstraint(cv == Expression.Sum(map.Select(kv => factor[kv[0]]*kv[1])));
                 }
 
                 Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
@@ -450,6 +450,44 @@ namespace FFXIVBisSolver
                     $"cap stats using used {bp} for {e} in slot {s}");
 
                 AddExprToDict(StatExprs, bp, cv);
+            }
+        }
+
+        private void AddSOS2(Dictionary<Variable, double> vars)
+        {
+            if (SolverConfig.SolverSupportsSOS)
+            {
+                Model.AddSOS2(vars);
+            }
+            else
+            {
+                var ordered = vars.OrderBy(kv => kv.Value).Select(kv => kv.Key).ToList();
+                var range = Enumerable.Range(0, ordered.Count - 1).ToList();
+                var segmentVars = new VariableCollection<int>(Model, range);
+                var binaryVars = new VariableCollection<int>(Model, range, type: VariableType.Binary);
+
+                Model.AddConstraint(Expression.Sum(range.Select(i => binaryVars[i])) == 1);
+                range.ForEach(i => Model.AddConstraint(segmentVars[i] <= binaryVars[i]));
+
+
+                Model.AddConstraint(ordered[0] == binaryVars[0] - segmentVars[0]);
+                Model.AddConstraint(ordered[ordered.Count-1] == (Expression) segmentVars[ordered.Count-2]);
+
+                for (var i = 0; i < ordered.Count; i++)
+                {
+                    var expr = Expression.EmptyExpression;
+                    if (i > 0)
+                    {
+                        expr += segmentVars[i - 1];
+                    }
+
+                    if (i < ordered.Count - 1)
+                    {
+                        expr += binaryVars[i] - segmentVars[i];
+                    }
+
+                    Model.AddConstraint(ordered[i] == expr);
+                }
             }
         }
 

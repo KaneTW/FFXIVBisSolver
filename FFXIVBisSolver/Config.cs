@@ -20,6 +20,7 @@ namespace FFXIVBisSolver
         public int OvermeldThreshold { get; set; }
         public int AllocatedStatsCap { get; set; }
         public bool MaximizeUnweightedValues { get; set; }
+        public bool SolverSupportsSOS { get; set; }
     }
 
     //TODO: this can be handled better

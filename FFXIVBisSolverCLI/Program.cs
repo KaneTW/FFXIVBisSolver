@@ -172,10 +172,9 @@ namespace FFXIVBisSolverCLI
                     {
                         case "Gurobi":
                             solver = new GurobiSolver();
+                            solverConfig.SolverSupportsSOS = true;
                             break;
-                        case "Z3":
-                            solver = new Z3Solver();
-                            break;
+
                     }
                 }
 
