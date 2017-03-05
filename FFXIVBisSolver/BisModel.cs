@@ -326,7 +326,6 @@ namespace FFXIVBisSolver
                 return;
             }
 
-
             var isConstrained = config.ConversionMap != null && config.ConversionMap.Any();
 
             Model.AddConstraint(
@@ -343,6 +342,14 @@ namespace FFXIVBisSolver
                 }
 
                 var cv = cap[s, e, bp];
+
+                var map = config.ConversionMap;
+
+                if (config.ConversionOverride != null && config.ConversionOverride.ContainsKey(bp) &&
+                    config.ConversionOverride[bp].Any())
+                {
+                    map = config.ConversionOverride[bp];
+                }
 
                 if (isConstrained)
                 {
