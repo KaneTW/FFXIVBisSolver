@@ -141,7 +141,7 @@ namespace FFXIVBisSolver
 
         public FoodItem ChosenFood
         {
-            get { return (FoodItem) VarCollToDict(food).FirstOrDefault(kv => kv.Key.Value > 0).Value[0]; }
+            get { return (FoodItem) VarCollToDict(food).FirstOrDefault(kv => kv.Key.Value > 0).Value?[0]; }
         }
 
         public IEnumerable<Tuple<EquipSlot, Equipment, MateriaItem, int>> ChosenMateria

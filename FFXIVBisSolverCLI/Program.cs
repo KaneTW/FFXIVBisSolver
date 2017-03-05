@@ -45,7 +45,13 @@ namespace FFXIVBisSolverCLI
             var noMaximizeUnweightedOpt = cliApp.Option("--no-maximize-unweighted",
                 "Choose to disable maximizing unweighted stats (usually accuracy). Shouldn't be needed.",
                 CommandOptionType.NoValue);
-            
+
+            var noFoodOpt = cliApp.Option("--no-food", "Disable food", CommandOptionType.NoValue);
+
+            var noMateriaOpt = cliApp.Option("--no-materia", "Disable materia", CommandOptionType.NoValue);
+
+            var noRelicOpt = cliApp.Option("--no-relic", "Disable relic", CommandOptionType.NoValue);
+
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)",
                 CommandOptionType.SingleValue);
 
@@ -130,11 +136,16 @@ namespace FFXIVBisSolverCLI
 
                 equip = equip.Where(e => e.ItemLevel.Key >= minIlvl && e.ItemLevel.Key <= maxIlvl).ToList();
 
-                var food = items.Where(FoodItem.IsFoodItem).Select(t => new FoodItem(t));
+                var food = noFoodOpt.HasValue() ? new List<FoodItem>() : items.Where(FoodItem.IsFoodItem).Select(t => new FoodItem(t));
 
-                var materia = items.OfType<MateriaItem>()
+                var materia = noMateriaOpt.HasValue() ? new Dictionary<MateriaItem, bool>() : items.OfType<MateriaItem>()
                     .ToDictionary(i => i,
                         i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
+
+                if (noRelicOpt.HasValue())
+                {
+                    solverConfig.RelicConfigs = new Dictionary<int, RelicConfig>();
+                }
 
                 //TODO: improve solver handling
                 SolverBase solver = new GLPKSolver();
@@ -177,8 +188,16 @@ namespace FFXIVBisSolverCLI
                     model.ChosenGear.ForEach(
                         kv =>
                             Console.WriteLine("\t" + string.Join(" or ", kv.EquipSlotCategory.PossibleSlots.OrderBy(s => s.ToString())) + ": " + kv));
-                    Console.WriteLine("Materia: ");
-                    model.ChosenMateria.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + ": " + kv.Item2 + ",\n\t\t - Materia: " + kv.Item3 + "\n\t\t\t   Amount: " + kv.Item4));
+
+                    if (model.ChosenMateria.Any())
+                    {
+                        Console.WriteLine("Materia: ");
+                        model.ChosenMateria.ForEach(
+                            kv =>
+                                Console.WriteLine("\t" + kv.Item1 + ": " + kv.Item2 + ",\n\t\t - Materia: " + kv.Item3 +
+                                                  "\n\t\t\t   Amount: " + kv.Item4));
+                    }
+
                     if (model.ChosenRelicStats.Any())
                     {
                         Console.WriteLine("Relic distribution: ");
@@ -186,8 +205,12 @@ namespace FFXIVBisSolverCLI
                         Console.WriteLine("Relic stats: ");
                         model.ChosenRelicStats.ForEach(kv => Console.WriteLine("\t" + kv.Item1 + " - " + kv.Item2 + ": " + kv.Item3));
                     }
-                    Console.WriteLine("Food: ");
-                    Console.WriteLine("\t" + model.ChosenFood);
+
+                    if (model.ChosenFood != null)
+                    {
+                        Console.WriteLine("Food: ");
+                        Console.WriteLine("\t" + model.ChosenFood);
+                    }
                     Console.WriteLine("Allocated stats: ");
                     model.ResultAllocatableStats.ForEach(kv => Console.WriteLine("\t" + kv.Key + ": " + kv.Value));
                     Console.WriteLine("Result stats with food:");
