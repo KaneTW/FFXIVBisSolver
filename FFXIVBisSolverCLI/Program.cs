@@ -32,7 +32,10 @@ namespace FFXIVBisSolverCLI
                 "Path to configuration YAML file, default to config.yaml", CommandOptionType.SingleValue);
 
             var excludedOpt = cliApp.Option("-X |--exclude <itemId>",
-                "Item ids of items to exclude from solving", CommandOptionType.MultipleValue);
+                "Item ids of gear or food to exclude from solving; repeat for non-unique items", CommandOptionType.MultipleValue);
+
+            var requiredOpt = cliApp.Option("-R |--require <itemId>",
+                "Item ids of items required when solving", CommandOptionType.MultipleValue);
 
             var minIlvlOpt = cliApp.Option("-m |--min-itemlevel <ilvl>",
                 "Minimum item level of items to consider. Uses max-20 if not passed.", CommandOptionType.SingleValue);
@@ -105,19 +108,33 @@ namespace FFXIVBisSolverCLI
                     var excludedIds = new List<int>();
                     foreach (var excluded in excludedOpt.Values)
                     {
-                        var id = int.Parse(excluded);
-                        var item = xivColl.Items[id];
-                        if (item != null)
+                        try
                         {
-                            Console.WriteLine($"Excluding {item}.");
+                            var id = int.Parse(excluded);
+                            var item = xivColl.Items[id];
                             excludedIds.Add(id);
                         }
-                        else
+                        catch (KeyNotFoundException)
                         {
-                            Console.Error.WriteLine($"Unknown id {id}, ignoring.");
+                            Console.Error.WriteLine($"Unknown id {excluded}, ignoring.");
+                        }
+                        catch (FormatException)
+                        {
+                            Console.Error.WriteLine($"Not an integer: {excluded}");
+                        }
+                        catch (OverflowException)
+                        {
+                            Console.Error.WriteLine($"Too large: {excluded}");
                         }
                     }
                     items = items.Where(k => !excludedIds.Contains(k.Key)).ToList();
+                }
+                
+                //TODO: duplicated code
+                if (requiredOpt.HasValue())
+                {
+                    requiredOpt.Values.Select(int.Parse).ForEach(solverConfig.RequiredItems.Add);
+
                 }
 
                 var equip = items.OfType<Equipment>().Where(e => e.ClassJobCategory.ClassJobs.Contains(classJob));
@@ -134,7 +151,7 @@ namespace FFXIVBisSolverCLI
                     minIlvl = int.Parse(minIlvlOpt.Value());
                 }
 
-                equip = equip.Where(e => e.ItemLevel.Key >= minIlvl && e.ItemLevel.Key <= maxIlvl).ToList();
+                equip = equip.Where(e => e.ItemLevel.Key >= minIlvl && e.ItemLevel.Key <= maxIlvl || solverConfig.RequiredItems!= null && solverConfig.RequiredItems.Contains(e.Key)).ToList();
 
                 var food = noFoodOpt.HasValue() ? new List<FoodItem>() : items.Where(FoodItem.IsFoodItem).Select(t => new FoodItem(t));
 

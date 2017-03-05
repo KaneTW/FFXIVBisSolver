@@ -63,8 +63,9 @@ namespace FFXIVBisSolver
             var allEquipSlots = GearChoices.SelectMany(g => g.EquipSlotCategory.PossibleSlots).ToList();
 
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
-                type: VariableType.Binary);
-            food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary);
+                type: VariableType.Binary, lowerBoundGenerator: (s,e) => CheckRequired(e) ? 1 : 0);
+            food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary, 
+                lowerBoundGenerator: i => CheckRequired(i.Item) ? 1 : 0);
             foodcap = new VariableCollection<FoodItem, BaseParam>(Model, FoodChoices, RelevantStats,
                 type: VariableType.Integer,
                 lowerBoundGenerator: (x, b) => 0);
@@ -106,6 +107,16 @@ namespace FFXIVBisSolver
             CreateObjective();
         }
 
+        private bool CheckRequired(Item i)
+        {
+            if (SolverConfig.RequiredItems != null && SolverConfig.RequiredItems.Contains(i.Key))
+            {
+                SolverConfig.RequiredItems.Remove(i.Key);
+                return true;
+            }
+            return false;
+        }
+
         
 
         public Model Model { get; }
@@ -141,7 +152,7 @@ namespace FFXIVBisSolver
 
         public FoodItem ChosenFood
         {
-            get { return (FoodItem) VarCollToDict(food).FirstOrDefault(kv => kv.Key.Value > 0).Value?[0]; }
+            get { return (FoodItem) VarCollToDict(food).SingleOrDefault(kv => kv.Key.Value > 0).Value[0]; }
         }
 
         public IEnumerable<Tuple<EquipSlot, Equipment, MateriaItem, int>> ChosenMateria
@@ -482,6 +493,8 @@ namespace FFXIVBisSolver
 
             IsSolved = true;
             Model.VariableCollections.ForEach(vc => vc.SetVariableValues(sol.VariableValues));
+            // fix bug with Value non-integer
+            Model.Variables.Where(v => v.Type != VariableType.Continuous).ForEach(v => v.Value = Math.Round(v.Value));
             ResultWeight = (Model.Objectives.First().Expression - DummyObjective).Evaluate(sol.VariableValues);
         }
 
