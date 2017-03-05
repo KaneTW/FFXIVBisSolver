@@ -122,7 +122,7 @@ jobConfigs:
       Determination: 0.159
       Spell Speed: 0.135
     statRequirements:
-      Accuracy: 593
+      Accuracy: 592
 
   AST:
     weights:
@@ -132,7 +132,7 @@ jobConfigs:
       Determination: 0.325
       Spell Speed: 0.178
     statRequirements:
-      Accuracy: 593
+      Accuracy: 592
 
 
 relicCaps:
