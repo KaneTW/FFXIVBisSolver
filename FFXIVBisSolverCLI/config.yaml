@@ -166,6 +166,7 @@ jobConfigs:
       Accuracy: 592
     baseCastTimes:
     - 2.5
+    - 3
 
 
 relicConfigs:
@@ -254,7 +255,7 @@ baseStats:
   Strength: 248
   Dexterity: 263
   Vitality: 228
-  Piety: 230
+  Piety: 263
   Intelligence: 262
   Mind: 264
   Accuracy: 354
