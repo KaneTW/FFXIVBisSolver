@@ -50,6 +50,9 @@
     <Reference Include="Gurobi70.NET">
       <HintPath>C:\gurobi702\win64\bin\Gurobi70.NET.dll</HintPath>
     </Reference>
+    <Reference Include="libglpk-cli">
+      <HintPath>..\dependencies\GLPK\lib\libglpk-cli.dll</HintPath>
+    </Reference>
     <Reference Include="MathNet.Numerics, Version=3.8.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MathNet.Numerics.3.8.0\lib\net40\MathNet.Numerics.dll</HintPath>
       <Private>True</Private>
@@ -66,8 +69,8 @@
       <HintPath>..\packages\Microsoft.Extensions.CommandLineUtils.1.1.0\lib\net451\Microsoft.Extensions.CommandLineUtils.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="optano.modeling, Version=0.0.0.1, Culture=neutral, PublicKeyToken=41b74c8b864fd6b1, processorArchitecture=MSIL">
-      <HintPath>..\packages\OPTANO.Modeling.1.2.2.216\lib\net40\optano.modeling.dll</HintPath>
+    <Reference Include="optano.modeling, Version=1.2.3.222, Culture=neutral, PublicKeyToken=41b74c8b864fd6b1, processorArchitecture=MSIL">
+      <HintPath>..\packages\OPTANO.Modeling.1.2.3.222\lib\net40\optano.modeling.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="SaintCoinach">
@@ -114,8 +117,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\dependencies\GLPK\lib\glpk_4_60.dll">
-      <Link>glpk_4_60.dll</Link>
+    <Content Include="..\dependencies\GLPK\lib\glpk_4_61.dll">
+      <Link>glpk_4_61.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\dependencies\GLPK\lib\libglpk_cli_native.dll">
+      <Link>libglpk_cli_native.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

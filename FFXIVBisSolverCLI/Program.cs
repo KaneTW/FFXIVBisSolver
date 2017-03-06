@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using FFXIVBisSolver;
 using Microsoft.Extensions.CommandLineUtils;
+using org.gnu.glpk;
 using OPTANO.Modeling.Common;
 using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
@@ -61,6 +62,8 @@ namespace FFXIVBisSolverCLI
 
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)",
                 CommandOptionType.SingleValue);
+
+            var noSolveOpt = cliApp.Option("--no-solve", "Don't solve the model; only works in conjunction with --debug", CommandOptionType.NoValue);
 
             var debugOpt = cliApp.Option("-d |--debug", "Print the used models in the current directory as model.lp",
                 CommandOptionType.NoValue);
@@ -139,12 +142,13 @@ namespace FFXIVBisSolverCLI
                 //TODO: duplicated code
                 if (requiredOpt.HasValue())
                 {
+                    solverConfig.RequiredItems = new List<int>();
                     requiredOpt.Values.Select(int.Parse).ForEach(solverConfig.RequiredItems.Add);
 
                 }
 
                 var equip = items.OfType<Equipment>().Where(e => e.ClassJobCategory.ClassJobs.Contains(classJob));
-
+                
                 var maxIlvl = equip.Max(x => x.ItemLevel.Key);
                 if (maxIlvlOpt.HasValue())
                 {
@@ -172,7 +176,7 @@ namespace FFXIVBisSolverCLI
                 }
 
                 //TODO: improve solver handling
-                SolverBase solver = new GLPKSolver();
+                SolverBase solver = CreateGLPKSolver();
                 if (solverOpt.HasValue())
                 {
                     switch (solverOpt.Value())
@@ -192,9 +196,6 @@ namespace FFXIVBisSolverCLI
 
                     if (debugOpt.HasValue())
                     {
-                        var obj = model.Model.Objectives.First();
-                        obj.Expression = obj.Expression.Normalize();
-                        model.Model.Constraints.ForEach(c => c.Expression = c.Expression.Normalize());
                         using (var f = new FileStream("model.lp", FileMode.Create))
                         {
                             model.Model.Write(f, FileType.LP);
@@ -203,9 +204,16 @@ namespace FFXIVBisSolverCLI
                         {
                             model.Model.Write(f, FileType.MPS);
                         }
+
+                        if (noSolveOpt.HasValue())
+                        {
+                            Console.WriteLine("Printed model, exiting...");
+                            return 0;
+                        }
                     }
 
                     var solution = solver.Solve(model.Model);
+
                     model.ApplySolution(solution);
 
                     if (outputOpt.HasValue())
@@ -228,6 +236,15 @@ namespace FFXIVBisSolverCLI
             });
 
             cliApp.Execute(args);
+        }
+
+        private static GLPKSolver CreateGLPKSolver()
+        {
+            //TODO heuristics
+            //TODO better GLPK configuration
+            GLPKSolver solver = new GLPKSolver();
+
+            return solver;
         }
 
         private static void OutputModel(BisModel model, TextWriter writer)
