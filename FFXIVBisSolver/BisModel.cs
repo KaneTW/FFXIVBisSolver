@@ -49,8 +49,8 @@ namespace FFXIVBisSolver
             Model = new Model();
 
             SolverConfig = solverConfig;
-
-            JobConfig = SolverConfig.JobConfigs[job];
+            Job = job;
+            JobConfig = SolverConfig.JobConfigs[Job];
 
             GearChoices = gearChoices.ToList();
             FoodChoices = foodChoices.ToList();
@@ -142,6 +142,7 @@ namespace FFXIVBisSolver
 
         public Model Model { get; }
         public SolverConfig SolverConfig { get; set; }
+        public ClassJob Job { get; }
         public JobConfig JobConfig { get; }
         public IList<Equipment> GearChoices { get; }
         public IList<FoodItem> FoodChoices { get; }
@@ -370,9 +371,13 @@ namespace FFXIVBisSolver
 
             var isNonSurjective = config.ConversionFunction != null;
 
+            var statCap = config.StatCapOverrides.ContainsKey(Job) && config.StatCapOverrides[Job].ContainsKey(s)
+                ? config.StatCapOverrides[Job][s]
+                : config.StatCap;
+
             Model.AddConstraint(
                 Expression.Sum(RelevantStats.Select(bp => isNonSurjective ? relicBase[s, e, bp] : cap[s, e, bp])) <=
-                config.StatCap*gv,
+                statCap*gv,
                 $"total relic cap for {e} in slot {s}");
             
             foreach (var bp in RelevantStats)

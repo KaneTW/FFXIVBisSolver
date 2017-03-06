@@ -31,6 +31,7 @@ namespace FFXIVBisSolver
     {
         public List<int> Items { get; set; }
         public int StatCap { get; set; }
+        public Dictionary<ClassJob, Dictionary<EquipSlot, int>> StatCapOverrides { get; set; }
         public PiecewiseLinearFunction ConversionFunction { get; set; }
         public Dictionary<BaseParam, PiecewiseLinearFunction> ConversionOverride { get; set; }
     }

@@ -58,6 +58,30 @@ namespace FFXIVBisSolverCLI
         }
     }
 
+    public class EquipSlotConverter : XivConverter
+    {
+        public EquipSlotConverter(XivCollection coll) : base(coll)
+        {
+        }
+
+        public override bool Accepts(Type type)
+        {
+            return type == typeof(EquipSlot);
+        }
+
+        public override object ReadYaml(IParser parser, Type type)
+        {
+            var value = parser.Expect<Scalar>().Value;
+            return XivCollection.EquipSlots.Single(s => string.Equals(s.Name, value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        public override void WriteYaml(IEmitter emitter, object value, Type type)
+        {
+            var s = (EquipSlot)value;
+            emitter.Emit(new Scalar(s.Name));
+        }
+    }
+
     public class ItemConverter : XivConverter
     {
         public ItemConverter(XivCollection coll) : base(coll)

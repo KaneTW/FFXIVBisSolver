@@ -173,6 +173,10 @@ relicConfigs:
   275: 
     items: [16050, 16051, 16052, 16053, 16054, 16055, 16056, 16057, 16058, 16059, 16060, 16061, 16062, 16063]
     statCap: 240
+    statCapOverrides:
+      PLD:
+        Main Hand: 172
+        Off Hand: 68
     conversionFunction:
     - [0, 0]
     - [5, 5]
