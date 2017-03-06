@@ -236,6 +236,7 @@ namespace FFXIVBisSolverCLI
                     Console.WriteLine("Result stats with food:");
                     model.ResultTotalStats.ForEach(kv => Console.WriteLine("\t" + kv.Key + ": " + kv.Value));
                     Console.WriteLine($"Result stat weight: {model.ResultWeight}");
+                    Console.WriteLine(solverConfig.UseTiers ? "SS tiers have been taken into account" : "SS tiers have been ignored; pass --use-tiers to enable (slow)");
                 }
 
                 return 0;
