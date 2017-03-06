@@ -102,7 +102,7 @@ namespace FFXIVBisSolverCLI
                 solverConfig.MaximizeUnweightedValues = !noMaximizeUnweightedOpt.HasValue();
                 solverConfig.UseTiers = tiersOpt.HasValue();
 
-                var classJob = xivColl.GetSheet<ClassJob>().Single(x => x.Abbreviation == jobArg.Value);
+                var classJob = xivColl.GetSheet<ClassJob>().Single(x => string.Equals(x.Abbreviation, jobArg.Value,StringComparison.InvariantCultureIgnoreCase));
 
                 var items = xivColl.GetSheet<Item>().ToList();
 

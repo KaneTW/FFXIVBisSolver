@@ -22,7 +22,9 @@ namespace FFXIVBisSolverCLI
         public override object ReadYaml(IParser parser, Type type)
         {
             var value = parser.Expect<Scalar>().Value;
-            return XivCollection.GetSheet<ClassJob>().Single(e => e.Abbreviation == value);
+            return
+                XivCollection.GetSheet<ClassJob>()
+                    .Single(e => string.Equals(e.Abbreviation, value, StringComparison.InvariantCultureIgnoreCase));
         }
 
         public override void WriteYaml(IEmitter emitter, object value, Type type)
@@ -46,7 +48,7 @@ namespace FFXIVBisSolverCLI
         public override object ReadYaml(IParser parser, Type type)
         {
             var value = parser.Expect<Scalar>().Value;
-            return XivCollection.GetSheet<BaseParam>().Single(bp => bp.Name == value);
+            return XivCollection.GetSheet<BaseParam>().Single(bp => string.Equals(bp.Name, value, StringComparison.InvariantCultureIgnoreCase));
         }
 
         public override void WriteYaml(IEmitter emitter, object value, Type type)
