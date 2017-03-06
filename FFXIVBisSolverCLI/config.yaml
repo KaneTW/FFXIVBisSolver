@@ -157,11 +157,11 @@ jobConfigs:
 
   AST:
     weights:
-      Magic Damage: 8.732
+      Magic Damage: 11.685
       Mind: 1
-      Critical Hit Rate: 0.204
-      Determination: 0.325
-      Spell Speed: 0.178
+      Critical Hit Rate: 0.253
+      Determination: 0.185
+      Spell Speed: 0.332
     statRequirements:
       Accuracy: 592
     baseCastTimes:
