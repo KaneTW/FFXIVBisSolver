@@ -9,6 +9,8 @@ namespace FFXIVBisSolver
     {
         public Dictionary<BaseParam, double> Weights { get; set; }
         public Dictionary<BaseParam, int> StatRequirements { get; set; }
+        public List<double> BaseCastTimes { get; set; }
+        public List<double> CastTimeBuffs { get; set; }
     }
 
     public class SolverConfig
@@ -21,6 +23,7 @@ namespace FFXIVBisSolver
         public int AllocatedStatsCap { get; set; }
         public bool MaximizeUnweightedValues { get; set; }
         public bool SolverSupportsSOS { get; set; }
+        public bool UseTiers { get; set; }
     }
 
     //TODO: this can be handled better

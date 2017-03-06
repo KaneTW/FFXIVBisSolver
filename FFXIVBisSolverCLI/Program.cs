@@ -55,6 +55,8 @@ namespace FFXIVBisSolverCLI
 
             var noRelicOpt = cliApp.Option("--no-relic", "Disable relic", CommandOptionType.NoValue);
 
+            var tiersOpt = cliApp.Option("--use-tiers", "Enable SS tiers. Warning: slow unless using a commercial solver", CommandOptionType.NoValue);
+
             var solverOpt = cliApp.Option("-s |--solver <solver>", "Solver to use (default: GLPK)",
                 CommandOptionType.SingleValue);
 
@@ -98,6 +100,7 @@ namespace FFXIVBisSolverCLI
                 }
 
                 solverConfig.MaximizeUnweightedValues = !noMaximizeUnweightedOpt.HasValue();
+                solverConfig.UseTiers = tiersOpt.HasValue();
 
                 var classJob = xivColl.GetSheet<ClassJob>().Single(x => x.Abbreviation == jobArg.Value);
 
@@ -155,9 +158,10 @@ namespace FFXIVBisSolverCLI
 
                 var food = noFoodOpt.HasValue() ? new List<FoodItem>() : items.Where(FoodItem.IsFoodItem).Select(t => new FoodItem(t));
 
+                var maxTier = items.OfType<MateriaItem>().Max(i => i.Tier);
                 var materia = noMateriaOpt.HasValue() ? new Dictionary<MateriaItem, bool>() : items.OfType<MateriaItem>()
-                    .ToDictionary(i => i,
-                        i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
+                    .Where(i => i.Tier == maxTier || (maxOvermeldTierOpt.HasValue() && i.Tier == int.Parse(maxOvermeldTierOpt.Value())))
+                    .ToDictionary(i => i, i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
 
                 if (noRelicOpt.HasValue())
                 {

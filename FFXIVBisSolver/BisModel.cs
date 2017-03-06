@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using MoreLinq;
 using OPTANO.Modeling.Optimization;
@@ -25,6 +26,8 @@ namespace FFXIVBisSolver
             "Mind",
             "Piety"
         };
+
+        private readonly string[] TieredStats = {"Skill Speed", "Spell Speed"};
 
         /// <summary>
         ///     Creates a new BiS solver model.
@@ -63,15 +66,13 @@ namespace FFXIVBisSolver
             var allEquipSlots = GearChoices.SelectMany(g => g.EquipSlotCategory.PossibleSlots).ToList();
 
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
-                type: VariableType.Binary, lowerBoundGenerator: (s,e) => CheckRequired(e) ? 1 : 0);
+                type: VariableType.Binary, lowerBoundGenerator: (s,e) => CheckRequired(e) ? 1 : 0, upperBoundGenerator: (s,e) => e.IsUnique ? 1 : double.PositiveInfinity);
             food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary, 
                 lowerBoundGenerator: i => CheckRequired(i.Item) ? 1 : 0);
             foodcap = new VariableCollection<FoodItem, BaseParam>(Model, FoodChoices, RelevantStats,
-                type: VariableType.Integer,
-                lowerBoundGenerator: (x, b) => 0);
+                type: VariableType.Integer, lowerBoundGenerator: (x, b) => 0);
             materia = new VariableCollection<EquipSlot, Equipment, MateriaItem>(Model, allEquipSlots, GearChoices,
-                MateriaChoices.Keys,
-                type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0);
+                MateriaChoices.Keys, type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0, upperBoundGenerator:(s,e,b) => MaxMateriaSlots);
             cap = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
                 RelevantStats, type: VariableType.Integer, lowerBoundGenerator: (s, e, b) => 0);
             relicBase = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
@@ -82,6 +83,8 @@ namespace FFXIVBisSolver
             modstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
                 lowerBoundGenerator: x => 0);
             allocstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+                lowerBoundGenerator: x => 0, upperBoundGenerator: x => SolverConfig.AllocatedStatsCap);
+            tieredstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
                 lowerBoundGenerator: x => 0);
 
             Model.AddConstraint(
@@ -93,18 +96,32 @@ namespace FFXIVBisSolver
             FoodExprs = RelevantStats.ToDictionary(bp => bp, bp => (Expression) stat[bp]);
             SolverConfig.BaseStats.ForEach(kv => StatExprs[kv.Key] = kv.Value + Expression.EmptyExpression);
 
-            var bigM = 50*
-                       GearChoices.Select(
-                           g =>
-                               g.AllParameters.Select(
-                                   p => p.Values.OfType<ParameterValueFixed>().Select(v => v.Amount).Max())
-                                   .Max()).Max();
-
             CreateGearModel();
 
             CreateFoodModel();
 
+            CreateTiers();
+
             CreateObjective();
+        }
+
+        private void CreateTiers()
+        {
+            RelevantStats.Where(bp => !CheckTiered(bp))
+                .ForEach(bp => Model.AddConstraint(tieredstat[bp] == (Expression) modstat[bp]));
+
+            foreach (var bp in RelevantStats.Where(CheckTiered))
+            {
+                //TODO: this can probably be optimized
+                var max = CalculateUpperBound(bp);
+                var pw = XivUtils.CreateSSTiers(JobConfig.BaseCastTimes, JobConfig.CastTimeBuffs, SolverConfig.BaseStats[bp], max);
+                pw.AddToModel(Model, modstat[bp], tieredstat[bp], SolverConfig.SolverSupportsSOS);
+            }
+        }
+
+        private int CalculateUpperBound(BaseParam bp)
+        {
+            return 13 * GearChoices.MaxBy(e => e.ItemLevel.Key).GetMaximumParamValue(bp);
         }
 
         private bool CheckRequired(Item i)
@@ -117,6 +134,10 @@ namespace FFXIVBisSolver
             return false;
         }
 
+        private bool CheckTiered(BaseParam bp)
+        {
+            return SolverConfig.UseTiers && TieredStats.Contains(bp.Name);
+        }
         
 
         public Model Model { get; }
@@ -132,6 +153,7 @@ namespace FFXIVBisSolver
         public VariableCollection<BaseParam> stat { get; }
         public VariableCollection<BaseParam> modstat { get; }
         public VariableCollection<BaseParam> allocstat { get; }
+        public VariableCollection<BaseParam> tieredstat { get; }
         public VariableCollection<EquipSlot, Equipment> gear { get; }
         public VariableCollection<FoodItem> food { get; }
         public VariableCollection<FoodItem, BaseParam> foodcap { get; }
@@ -152,7 +174,7 @@ namespace FFXIVBisSolver
 
         public FoodItem ChosenFood
         {
-            get { return (FoodItem) food.VarCollToDict().SingleOrDefault(kv => kv.Key.Value > 0).Value[0]; }
+            get { return (FoodItem) food.VarCollToDict().SingleOrDefault(kv => kv.Key.Value > 0).Value?[0]; }
         }
 
         public IEnumerable<Tuple<EquipSlot, Equipment, MateriaItem, int>> ChosenMateria
@@ -218,7 +240,12 @@ namespace FFXIVBisSolver
 
                 if (JobConfig.Weights.ContainsKey(bp))
                 {
-                    objExpr += JobConfig.Weights[bp]*modstat[bp];
+                    if (SolverConfig.MaximizeUnweightedValues && TieredStats.Contains(bp.Name))
+                    {
+                        // add a small dummy weight so shown stats are amxed out
+                        DummyObjective += modstat[bp]*1e-5;
+                    }
+                    objExpr += JobConfig.Weights[bp]*tieredstat[bp];
                 }
 
                 if (JobConfig.StatRequirements.ContainsKey(bp))
@@ -289,11 +316,14 @@ namespace FFXIVBisSolver
             foreach (var grp in GearChoices.GroupBy(g => g.EquipSlotCategory))
             {
                 // if gear is unique, equip it once only.
-                grp.Where(e => e.IsUnique)
-                    .ForEach(
-                        e =>
-                            Model.AddConstraint(Expression.Sum(grp.Key.PossibleSlots.Select(s => gear[s, e])) <= 1,
-                                $"ensure gear uniqueness for {e}"));
+                if (grp.Key.PossibleSlots.Count() > 1)
+                {
+                    grp.Where(e => e.IsUnique)
+                        .ForEach(
+                            e =>
+                                Model.AddConstraint(Expression.Sum(grp.Key.PossibleSlots.Select(s => gear[s, e])) <= 1,
+                                    $"ensure gear uniqueness for {e}"));
+                }
 
                 // SIMPLIFICATION: we ignore blocked slots
                 foreach (var s in grp.Key.PossibleSlots)
@@ -369,7 +399,6 @@ namespace FFXIVBisSolver
 
                 Model.AddConstraint(cv <= remCap*gv, $"upper stat cap for {bp} of relic {e} in slot {s}");
                 StatExprs.AddExprToDict(bp, cv);
-                // SIMPLIFICATION: impossible-to-reach stat values are ignored. Can be handled by using Model.AddAlternativeConstraint(cv <= badVal - 1, cv >= badVal +1, bigM)
             }
         }
 
@@ -382,6 +411,7 @@ namespace FFXIVBisSolver
             var gv = gear[s, e];
             var totalSlots = e.IsAdvancedMeldingPermitted ? MaxMateriaSlots : e.FreeMateriaSlots;
 
+            //TODO: you can probably optimize tons here
             Model.AddConstraint(
                 Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= totalSlots*gv,
                 $"restrict total materia amount to amount permitted for {e} in {s}");

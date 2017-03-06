@@ -9,6 +9,8 @@ jobConfigs:
       Skill Speed: 0.274
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
 
   WAR:
     weights:
@@ -21,6 +23,8 @@ jobConfigs:
     statRequirements:
       Accuracy: 699
       Skill Speed: 550
+    baseCastTimes:
+    - 2.5
 
   DRK:
     weights:
@@ -33,6 +37,8 @@ jobConfigs:
       Parry: 0.011
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
 
   DRG:
     weights:
@@ -43,6 +49,8 @@ jobConfigs:
       Skill Speed: 0.170
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
 
   MNK:
     weights:
@@ -53,6 +61,10 @@ jobConfigs:
       Skill Speed: 0.173
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
+    castTimeBuffs:
+    - 0.15
 
   NIN:
     weights:
@@ -63,6 +75,10 @@ jobConfigs:
       Skill Speed: 0.141
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
+    castTimeBuffs:
+    - 0.15
 
   BRD:
     weights:
@@ -73,6 +89,9 @@ jobConfigs:
       Critical Hit Rate: 0.366
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
+
 
   MCH:
     weights:
@@ -83,6 +102,8 @@ jobConfigs:
       Critical Hit Rate: 0.210
     statRequirements:
       Accuracy: 699
+    baseCastTimes:
+    - 2.5
 
   BLM:
     weights:
@@ -93,6 +114,10 @@ jobConfigs:
       Spell Speed: 0.283
     statRequirements:
       Accuracy: 592
+    baseCastTimes:
+    - 2.5
+    - 3
+    - 3.5
 
   SMN:
     weights:
@@ -103,6 +128,8 @@ jobConfigs:
       Spell Speed: 0.195
     statRequirements:
       Accuracy: 592
+    baseCastTimes:
+    - 2.5
 
   SCH:
     weights:
@@ -113,6 +140,8 @@ jobConfigs:
       Spell Speed: 0.366
     statRequirements:
       Accuracy: 592
+    baseCastTimes:
+    - 2.5
   
   WHM:
     weights:
@@ -123,6 +152,9 @@ jobConfigs:
       Spell Speed: 0.135
     statRequirements:
       Accuracy: 592
+    baseCastTimes:
+    - 2.5
+    - 3
 
   AST:
     weights:
@@ -133,6 +165,8 @@ jobConfigs:
       Spell Speed: 0.178
     statRequirements:
       Accuracy: 592
+    baseCastTimes:
+    - 2.5
 
 
 relicConfigs:
@@ -232,4 +266,3 @@ baseStats:
 
 allocatedStatsCap: 35
 overmeldThreshold: 0
-maximizeUnweightedValues: true
