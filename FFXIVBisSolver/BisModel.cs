@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using MoreLinq;
 using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
@@ -66,25 +67,47 @@ namespace FFXIVBisSolver
             var allEquipSlots = GearChoices.SelectMany(g => g.EquipSlotCategory.PossibleSlots).ToList();
 
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
-                type: VariableType.Binary, lowerBoundGenerator: (s,e) => CheckRequired(e) ? 1 : 0, upperBoundGenerator: (s,e) => e.IsUnique ? 1 : double.PositiveInfinity);
-            food = new VariableCollection<FoodItem>(Model, FoodChoices, type: VariableType.Binary, 
+                type: VariableType.Binary,
+                debugNameGenerator: (s, e) => new StringBuilder().AppendFormat("{0}_{1}", s, e),
+                lowerBoundGenerator: (s, e) => CheckRequired(e) ? 1 : 0,
+                upperBoundGenerator: (s, e) => e.IsUnique ? 1 : double.PositiveInfinity);
+            food = new VariableCollection<FoodItem>(Model, FoodChoices, 
+                type: VariableType.Binary, 
+                debugNameGenerator: e => new StringBuilder().AppendFormat("{0}", e.Item),
                 lowerBoundGenerator: i => CheckRequired(i.Item) ? 1 : 0);
             foodcap = new VariableCollection<FoodItem, BaseParam>(Model, FoodChoices, RelevantStats,
-                type: VariableType.Integer, lowerBoundGenerator: (x, b) => 0);
-            materia = new VariableCollection<EquipSlot, Equipment, MateriaItem>(Model, allEquipSlots, GearChoices,
-                MateriaChoices.Keys, type: VariableType.Integer, lowerBoundGenerator: (s, e, bp) => 0, upperBoundGenerator:(s,e,b) => MaxMateriaSlots);
-            cap = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
-                RelevantStats, type: VariableType.Integer, lowerBoundGenerator: (s, e, b) => 0);
-            relicBase = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices,
-                RelevantStats, type: VariableType.Integer, lowerBoundGenerator: (s, e, b) => 0);
+                type: VariableType.Integer,
+                debugNameGenerator: (i, bp) => new StringBuilder().AppendFormat("{0}_{1}_cap", i.Item, bp),
+                lowerBoundGenerator: (x, b) => 0);
+            materia = new VariableCollection<EquipSlot, Equipment, MateriaItem>(Model, allEquipSlots, GearChoices, MateriaChoices.Keys, 
+                type: VariableType.Integer, 
+                debugNameGenerator: (s, e, m) => new StringBuilder().AppendFormat("{2}_{0}_{1}", s, e, m),
+                lowerBoundGenerator: (s, e, bp) => 0, 
+                upperBoundGenerator:(s,e,b) => MaxMateriaSlots);
+            cap = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: (s, e, bp) => new StringBuilder().AppendFormat("{2}_cap_{0}_{1}", s,e,bp),
+                lowerBoundGenerator: (s, e, b) => 0);
+            relicBase = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: (s, e, bp) => new StringBuilder().AppendFormat("{2}_relic_base_{0}_{1}", s, e, bp),
+                lowerBoundGenerator: (s, e, b) => 0);
 
-            stat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+            stat = new VariableCollection<BaseParam>(Model, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: bp => new StringBuilder().AppendFormat("gear_materia__{0}", bp),
                 lowerBoundGenerator: x => 0);
-            modstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+            modstat = new VariableCollection<BaseParam>(Model, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: bp => new StringBuilder().AppendFormat("added_food_{0}", bp),
                 lowerBoundGenerator: x => 0);
-            allocstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+            allocstat = new VariableCollection<BaseParam>(Model, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: bp => new StringBuilder().AppendFormat("allocated_{0}", bp),
                 lowerBoundGenerator: x => 0, upperBoundGenerator: x => SolverConfig.AllocatedStatsCap);
-            tieredstat = new VariableCollection<BaseParam>(Model, RelevantStats, type: VariableType.Integer,
+            tieredstat = new VariableCollection<BaseParam>(Model, RelevantStats, 
+                type: VariableType.Integer,
+                debugNameGenerator: bp => new StringBuilder().AppendFormat("tiered_{0}", bp),
                 lowerBoundGenerator: x => 0);
 
             Model.AddConstraint(
@@ -428,7 +451,7 @@ namespace FFXIVBisSolver
                     Model.AddConstraint(
                         Expression.Sum(
                             MateriaChoices.Where(m => MainStats.Contains(m.Key.BaseParam.Name))
-                                .Select(m => materia[s, e, m.Key])) <= e.FreeMateriaSlots,
+                                .Select(m => materia[s, e, m.Key])) <= e.FreeMateriaSlots * gv,
                         $"restrict advanced melding for mainstat materia to amount of slots in {e} in {s}");
                 }
                 if (MateriaChoices.Any(m => !m.Value))
@@ -436,7 +459,7 @@ namespace FFXIVBisSolver
                     Model.AddConstraint(
                         Expression.Sum(
                             MateriaChoices.Where(m => !m.Value).Select(m => materia[s, e, m.Key])) <=
-                        e.FreeMateriaSlots + SolverConfig.OvermeldThreshold,
+                        (e.FreeMateriaSlots + SolverConfig.OvermeldThreshold)*gv,
                         $"restrict regular materia amount to amount permitted for {e} in {s}");
                 }
             }

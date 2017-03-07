@@ -27,7 +27,7 @@ namespace FFXIVBisSolver
         public void AddToModel(Model model, Variable x, Variable y, bool useSosWorkaround)
         {
             var range = Enumerable.Range(0, Segments.Count);
-            var factor = new VariableCollection<int>(model, range);
+            var factor = new VariableCollection<int>(model, range, debugNameGenerator: i => new StringBuilder().AppendFormat("sos2_factor_{0}", i));
             var sos2Vars = Segments.ToDictionary(kv => factor[Segments.IndexOf(kv)],
                 kv => (double) Segments.IndexOf(kv));
 

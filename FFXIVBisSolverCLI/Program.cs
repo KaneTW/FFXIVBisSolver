@@ -7,6 +7,7 @@ using Microsoft.Extensions.CommandLineUtils;
 using org.gnu.glpk;
 using OPTANO.Modeling.Common;
 using OPTANO.Modeling.Optimization;
+using OPTANO.Modeling.Optimization.Configuration;
 using OPTANO.Modeling.Optimization.Enums;
 using OPTANO.Modeling.Optimization.Solver.GLPK;
 using OPTANO.Modeling.Optimization.Solver.Gurobi702;
@@ -189,12 +190,15 @@ namespace FFXIVBisSolverCLI
                     }
                 }
 
-                using (var scope = new ModelScope())
+                var debug = debugOpt.HasValue();
+                var settings = new OptimizationConfigSection {ModelElement = {EnableFullNames = debug}};
+
+                using (var scope = new ModelScope(settings))
                 {
                     var model = new BisModel(solverConfig, classJob,
                         equip, food, materia);
 
-                    if (debugOpt.HasValue())
+                    if (debug)
                     {
                         using (var f = new FileStream("model.lp", FileMode.Create))
                         {
