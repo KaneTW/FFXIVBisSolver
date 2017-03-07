@@ -10,15 +10,15 @@ namespace FFXIVBisSolver
     public class XivUtils
     {
         public static PiecewiseLinearFunction CreateSSTiers(List<double> baseCastTimes, List<double> castTimeBuffs,
-            int minStat, int maxStat)
+            int minStat, int count)
         {
             if (castTimeBuffs == null || !castTimeBuffs.Any())
             {
                 castTimeBuffs = new List<double> {0};
             }
-
+            
             var map =
-                Enumerable.Range(minStat, maxStat - minStat)
+                Enumerable.Range(minStat, count)
                     .Select(
                         x =>
                             new

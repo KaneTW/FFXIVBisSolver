@@ -5,11 +5,17 @@ using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
 using OPTANO.Modeling.Optimization.Interfaces;
 using SaintCoinach.Xiv;
+using SaintCoinach.Xiv.Items;
 
 namespace FFXIVBisSolver
 {
     public static class OptanoExtensions
     {
+
+        public static int TotalMateriaSlots(this Equipment e)
+        {
+            return e.IsAdvancedMeldingPermitted ? BisModel.MaxMateriaSlots : e.FreeMateriaSlots;
+        }
 
         public static Dictionary<Variable, object[]> VarCollToDict(this IVariableCollection coll)
         {

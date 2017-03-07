@@ -15,9 +15,9 @@ namespace FFXIVBisSolver
 {
     public class BisModel
     {
-        private const int MaxMateriaSlots = 5;
+        public const int MaxMateriaSlots = 5;
 
-        private readonly string[] MainStats =
+        public readonly string[] MainStats =
         {
             "Vitality",
             "Strength",
@@ -28,7 +28,7 @@ namespace FFXIVBisSolver
             "Piety"
         };
 
-        private readonly string[] TieredStats = {"Skill Speed", "Spell Speed"};
+        public readonly string[] TieredStats = {"Skill Speed", "Spell Speed"};
 
         /// <summary>
         ///     Creates a new BiS solver model.
@@ -69,8 +69,7 @@ namespace FFXIVBisSolver
             gear = new VariableCollection<EquipSlot, Equipment>(Model, allEquipSlots, GearChoices,
                 type: VariableType.Binary,
                 debugNameGenerator: (s, e) => new StringBuilder().AppendFormat("{0}_{1}", s, e),
-                lowerBoundGenerator: (s, e) => CheckRequired(e) ? 1 : 0,
-                upperBoundGenerator: (s, e) => e.IsUnique ? 1 : double.PositiveInfinity);
+                lowerBoundGenerator: (s, e) => CheckRequired(e) ? 1 : 0);
             food = new VariableCollection<FoodItem>(Model, FoodChoices, 
                 type: VariableType.Binary, 
                 debugNameGenerator: e => new StringBuilder().AppendFormat("{0}", e.Item),
@@ -83,7 +82,7 @@ namespace FFXIVBisSolver
                 type: VariableType.Integer, 
                 debugNameGenerator: (s, e, m) => new StringBuilder().AppendFormat("{2}_{0}_{1}", s, e, m),
                 lowerBoundGenerator: (s, e, bp) => 0, 
-                upperBoundGenerator:(s,e,b) => MaxMateriaSlots);
+                upperBoundGenerator:(s,e,b) => e.TotalMateriaSlots());
             cap = new VariableCollection<EquipSlot, Equipment, BaseParam>(Model, allEquipSlots, GearChoices, RelevantStats, 
                 type: VariableType.Integer,
                 debugNameGenerator: (s, e, bp) => new StringBuilder().AppendFormat("{2}_cap_{0}_{1}", s,e,bp),
@@ -121,6 +120,8 @@ namespace FFXIVBisSolver
 
             CreateGearModel();
 
+            CreateMateriaOrdering();
+            
             CreateFoodModel();
 
             CreateTiers();
@@ -144,7 +145,7 @@ namespace FFXIVBisSolver
 
         private int CalculateUpperBound(BaseParam bp)
         {
-            return 13 * GearChoices.MaxBy(e => e.ItemLevel.Key).GetMaximumParamValue(bp);
+            return 13 * GearChoices.Max(e => e.GetMaximumParamValue(bp));
         }
 
         private bool CheckRequired(Item i)
@@ -437,11 +438,9 @@ namespace FFXIVBisSolver
                 return;
             }
             var gv = gear[s, e];
-            var totalSlots = e.IsAdvancedMeldingPermitted ? MaxMateriaSlots : e.FreeMateriaSlots;
-
             //TODO: you can probably optimize tons here
             Model.AddConstraint(
-                Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= totalSlots*gv,
+                Expression.Sum(MateriaChoices.Select(m => materia[s, e, m.Key])) <= e.TotalMateriaSlots()*gv,
                 $"restrict total materia amount to amount permitted for {e} in {s}");
 
             if (e.IsAdvancedMeldingPermitted)
@@ -500,7 +499,32 @@ namespace FFXIVBisSolver
             }
         }
 
- 
+        
+        private void CreateMateriaOrdering()
+        {
+            if (!MateriaChoices.Any())
+            {
+                return;
+            }
+            
+            // collect all equip slots and assign canonical order
+            var equipSlots =
+                GearChoices.SelectMany(e => e.EquipSlotCategory.PossibleSlots)
+                    .DistinctBy(s => s.Name)
+                    .OrderBy(s => s.Name)
+                    .ToList();
+            for (var i = 0; i < equipSlots.Count ; i++)
+            {
+                var s = equipSlots[i];
+                var grp = GearChoices.Where(e => e.EquipSlotCategory.PossibleSlots.Contains(s));
+                foreach (var e in grp)
+                {
+                    MateriaChoices.ForEach(m => materia[s, e, m.Key].BranchingPriority = i);
+                }
+            }
+        }
+
+
 
         /// <summary>
         ///     Apply a given solution. IT IS THE USER'S RESPONSIBILITY TO CHECK THAT THE SOLUTION SUCCEEDED.

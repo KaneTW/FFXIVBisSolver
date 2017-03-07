@@ -24,7 +24,8 @@ namespace FFXIVBisSolver
 
         public List<Tuple<int, int>> Segments { get; set; }
 
-        public void AddToModel(Model model, Variable x, Variable y, bool useSosWorkaround)
+        // returns the final SOS2 factor, for checking whether the piecewise's function bound was sufficient
+        public Variable AddToModel(Model model, Variable x, Variable y, bool useSosWorkaround)
         {
             var range = Enumerable.Range(0, Segments.Count);
             var factor = new VariableCollection<int>(model, range, debugNameGenerator: i => new StringBuilder().AppendFormat("sos2_factor_{0}", i));
@@ -36,6 +37,8 @@ namespace FFXIVBisSolver
             model.AddConstraint(x == Expression.Sum(Segments.Select((kv, ix) => factor[ix] * kv.Item1)));
 
             model.AddConstraint(y == Expression.Sum(Segments.Select((kv, ix) => factor[ix] * kv.Item2)));
+
+            return factor[Segments.Count - 1];
         }
     }
 }
