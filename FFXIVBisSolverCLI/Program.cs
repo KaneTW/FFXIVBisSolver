@@ -167,7 +167,7 @@ namespace FFXIVBisSolverCLI
 
                 var maxTier = items.OfType<MateriaItem>().Max(i => i.Tier);
                 var materia = noMateriaOpt.HasValue() ? new Dictionary<MateriaItem, bool>() : items.OfType<MateriaItem>()
-                    .Where(i => i.Tier == maxTier || (maxOvermeldTierOpt.HasValue() && i.Tier == int.Parse(maxOvermeldTierOpt.Value())))
+                    .Where(i => i.Tier == maxTier || (maxOvermeldTierOpt.HasValue() && i.Tier == int.Parse(maxOvermeldTierOpt.Value()) - 1))
                     .ToDictionary(i => i, i => !maxOvermeldTierOpt.HasValue() || i.Tier < int.Parse(maxOvermeldTierOpt.Value()));
 
                 if (noRelicOpt.HasValue())
