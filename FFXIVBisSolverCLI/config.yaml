@@ -147,7 +147,7 @@ jobConfigs:
     weights:
       Magic Damage: 9.128
       Mind: 1
-      Critical Hit Rate: 0.282
+      Critical Hit Rate: 0.182
       Determination: 0.159
       Spell Speed: 0.135
     statRequirements:
