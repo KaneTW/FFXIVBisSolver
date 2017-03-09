@@ -271,7 +271,8 @@ baseStats:
   Spell Speed: 354
 
 equipmentOverrides:
-  Coven Shield:
+  # Add stats like in e.g. baseStats
+  Coven Shield: 
   Coven Blade:
   Coven Fangs:
   Coven Battleaxe:
