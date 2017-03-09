@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SaintCoinach.Xiv;
+using SaintCoinach.Xiv.Items;
 
 namespace FFXIVBisSolver
 {
@@ -19,6 +20,8 @@ namespace FFXIVBisSolver
         public Dictionary<int, RelicConfig> RelicConfigs { get; set; }
         public Dictionary<BaseParam, int> BaseStats { get; set; }
         public List<int> RequiredItems { get; set; }
+        public Dictionary<Equipment, Dictionary<BaseParam, int>> EquipmentOverrides { get; set; }
+
         public int OvermeldThreshold { get; set; }
         public int AllocatedStatsCap { get; set; }
         public bool MaximizeUnweightedValues { get; set; }

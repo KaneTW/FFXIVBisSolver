@@ -8,6 +8,7 @@ using OPTANO.Modeling.Optimization;
 using OPTANO.Modeling.Optimization.Enums;
 using OPTANO.Modeling.Optimization.Interfaces;
 using OPTANO.Modeling.Optimization.Solver;
+using SaintCoinach.Text.Nodes;
 using SaintCoinach.Xiv;
 using SaintCoinach.Xiv.Items;
 
@@ -359,13 +360,39 @@ namespace FFXIVBisSolver
                     foreach (var e in grp)
                     {
                         var gv = gear[s, e];
-                        // ASSUMPTION: all gear choices have fixed parameters
-                        e.AllParameters.Where(p => RelevantStats.Contains(p.BaseParam))
-                            .ForEach(
-                                p =>
-                                    StatExprs.AddExprToDict(p.BaseParam,
-                                        p.Values.Sum(v => ((ParameterValueFixed) v).Amount)*gv));
 
+                        // ASSUMPTION: all gear choices have fixed parameters
+                        var stats =
+                            e.AllParameters.Where(p => RelevantStats.Contains(p.BaseParam))
+                                .ToDictionary(p => p.BaseParam,
+                                    p => p.Values.OfType<ParameterValueFixed>().Select(val => val.Amount).Sum());
+
+                        if (SolverConfig.EquipmentOverrides?.ContainsKey(e) ?? false)
+                        {
+                            var statsOverride = SolverConfig.EquipmentOverrides[e];
+
+                            if (statsOverride == null)
+                            {
+                                continue;
+                            }
+
+                            foreach (var kv in statsOverride)
+                            {
+                                stats[kv.Key] = kv.Value;
+                            }
+                        }
+
+                        // sanity check stats
+                        foreach (var kv in stats)
+                        {
+                            if (e.GetMaximumParamValue(kv.Key) < kv.Value)
+                            {
+                                Console.Error.WriteLine($"{kv.Key} => {kv.Value} for {e} is out of range");
+                            }
+                        }
+                        
+                        stats.ForEach(p => StatExprs.AddExprToDict(p.Key, p.Value*gv));
+                        
                         // ASSUMPTION: all meldable items have at least one materia slot
                         // ASSUMPTION: customisable relics are unmeldable
                         if (e.FreeMateriaSlots > 0)

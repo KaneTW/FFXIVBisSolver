@@ -270,5 +270,22 @@ baseStats:
   Skill Speed: 354
   Spell Speed: 354
 
+equipmentOverrides:
+  Coven Shield:
+  Coven Blade:
+  Coven Fangs:
+  Coven Battleaxe:
+  Coven Spear:
+  Coven Longbow:
+  Coven Claws:
+  Coven Cane:
+  Coven Rod:
+  Coven Grimoire:
+  Coven Codex:
+  Coven Greatsword:
+  Coven Musketoon:
+  Coven Astrometer:
+  
+
 allocatedStatsCap: 35
 overmeldThreshold: 0

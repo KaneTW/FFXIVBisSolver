@@ -90,19 +90,19 @@ namespace FFXIVBisSolverCLI
 
         public override bool Accepts(Type type)
         {
-            return type.IsSubclassOf(typeof (Item));
+            return type == typeof (Item) || type.IsSubclassOf(typeof (Item));
         }
 
         public override object ReadYaml(IParser parser, Type type)
         {
-            var value = TypeConverter.ChangeType<int>(parser.Expect<Scalar>().Value);
-            return XivCollection.GetSheet<Item>()[value];
+            var value = parser.Expect<Scalar>().Value;
+            return XivCollection.GetSheet<Item>().Single(i => i.Name == value);
         }
 
         public override void WriteYaml(IEmitter emitter, object value, Type type)
         {
             var item = (Item) value;
-            emitter.Emit(new Scalar(item.Key.ToString()));
+            emitter.Emit(new Scalar(item.Name.ToString()));
         }
     }
 

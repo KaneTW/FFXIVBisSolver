@@ -95,6 +95,7 @@ namespace FFXIVBisSolverCLI
                     .WithTypeConverter(new BaseParamConverter(xivColl))
                     .WithTypeConverter(new ClassJobConverter(xivColl))
                     .WithTypeConverter(new EquipSlotConverter(xivColl))
+                    .WithTypeConverter(new ItemConverter(xivColl))
                     .WithTypeConverter(new PiecewiseLinearConverter())
                     .WithNamingConvention(new CamelCaseNamingConvention())
                     .Build();
@@ -191,7 +192,8 @@ namespace FFXIVBisSolverCLI
                 }
 
                 var debug = debugOpt.HasValue();
-                var settings = new OptimizationConfigSection {ModelElement = {EnableFullNames = debug}};
+                var settings = new OptimizationConfigSection();
+                //settings.ModelElement.EnableFullNames = debug;
 
                 using (var scope = new ModelScope(settings))
                 {
