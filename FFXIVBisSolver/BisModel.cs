@@ -339,6 +339,27 @@ namespace FFXIVBisSolver
 
         private void CreateGearModel()
         {
+
+            // build a list of required items originally passed by -R
+            // the item ids in the original SolverConfig.RequiredItems list itself are later consumed 
+            //      by gear[s,e] (via CheckRequired called by lowerBoundGenerator init)
+            var requiredEquipmentList = new List<Equipment>();
+            if(SolverConfig.RequiredItems != null)
+            {
+                foreach (var id in SolverConfig.RequiredItems)
+                {
+                    Equipment requiredEquipment = GearChoices.Where(g => g.Key == id).FirstOrDefault();
+                    if(requiredEquipment != null)
+                    {
+                        requiredEquipmentList.Add(requiredEquipment);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"requirement for item {id} ignored due to explicit exclusion or inability to equip");
+                    }
+                }
+            }
+
             foreach (var grp in GearChoices.GroupBy(g => g.EquipSlotCategory))
             {
                 // if gear is unique, equip it once only.
@@ -360,6 +381,15 @@ namespace FFXIVBisSolver
                     foreach (var e in grp)
                     {
                         var gv = gear[s, e];
+
+                        // add constraints to enforce user-specified item requirements
+                        // this is essentially the same construct as the uniqueness check above, where the item must be
+                        //      equipped one or more times in the gear model (more, in the case of rings)
+                        if(requiredEquipmentList.Count > 0 && requiredEquipmentList.Contains(e))
+                        {
+                            Model.AddConstraint(Expression.Sum(grp.Key.PossibleSlots.Select(x => gear[x, e])) >= 1, 
+                                $"explicit user requirement for gear {e}");
+                        }
 
                         // ASSUMPTION: all gear choices have fixed parameters
                         var stats =
